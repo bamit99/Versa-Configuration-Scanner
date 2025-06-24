@@ -32,8 +32,8 @@ This is a web-based tool to audit Versa Networks configuration files for securit
 
 1.  **Clone the repository:**
     ```bash
-    git clone <repository-url>
-    cd <repository-directory>
+    git clone https://github.com/bamit99/Versa-Configuration-Scanner.git
+    cd Versa-Configuration-Scanner
     ```
 
 2.  **Create and activate a virtual environment:**
@@ -43,7 +43,7 @@ This is a web-based tool to audit Versa Networks configuration files for securit
     source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 
     # Or using conda
-    conda create --name versa-auditor python=3.8
+    conda create --name versa-auditor python=3.11
     conda activate versa-auditor
     ```
 
