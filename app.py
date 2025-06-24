@@ -91,8 +91,8 @@ class VersaConfigParser:
 
     def parse_cli_config(self, cli_output):
         """
-        Parses Versa CLI configuration output (set commands) into a structured dictionary.
-        Handles value assignments to keys that are also parent nodes for other keys.
+        Parses Versa CLI configuration output into a structured dictionary.
+        This version handles complex nested structures and value assignments robustly.
         """
         config_dict = {}
         for line in cli_output.strip().split('\n'):
@@ -111,43 +111,37 @@ class VersaConfigParser:
 
             current_level = config_dict
             for i, part in enumerate(parts):
-                # If we are at the last part, it's a value or a presence flag
-                if i == len(parts) - 1:
-                    # It's a presence flag, e.g., 'set system services ssh'
-                    if isinstance(current_level, dict):
-                         current_level[part] = {'__present__': True}
+                # If we are at the end of a path that assigns a value
+                if i == len(parts) - 2:
+                    key = parts[i]
+                    value = parts[i+1]
+                    # Ensure the current level at this key is a dictionary
+                    if key not in current_level:
+                        current_level[key] = {}
+                    elif not isinstance(current_level[key], dict):
+                         # If it's not a dict, it was likely a presence flag. Convert it.
+                         current_level[key] = {'__present__': True}
+
+                    # Assign the value to the special '__value__' key
+                    current_level[key]['__value__'] = value
+                    break # End processing for this line
+                
+                # If it's a command without a value (a presence flag)
+                elif i == len(parts) - 1:
+                    current_level[part] = {'__present__': True}
                     break
 
-                next_part = parts[i+1]
-                # If the next part is the last part, then the current part is the key and the next is the value
-                if i + 1 == len(parts) - 1:
-                    if part not in current_level:
-                        current_level[part] = next_part
-                    # If the key already exists, convert it to a list of values
-                    elif isinstance(current_level[part], list):
-                        current_level[part].append(next_part)
-                    else: # It exists and is not a list
-                        # If it's a dictionary, add the value as a special key
-                        if isinstance(current_level[part], dict):
-                            current_level[part]['__value__'] = next_part
-                        else: # It's a single value, convert to list
-                            current_level[part] = [current_level[part], next_part]
-                    break # Done with this line
-                
-                # Navigate deeper into the dictionary
+                # Navigate deeper
                 if part not in current_level:
                     current_level[part] = {}
                 
-                # If we encounter a string where a dict should be, we need to convert it
-                if isinstance(current_level[part], str):
-                    # Convert the existing string value into a dict with a special __value__ key
-                    current_level[part] = {'__value__': current_level[part]}
+                # If the path is obstructed by a non-dictionary, log it and stop.
+                # This case should be rare with the new logic but is a good safeguard.
+                if not isinstance(current_level[part], dict):
+                     app.logger.warning(f"Configuration conflict in line: '{line}'. Path is obstructed at '{part}'.")
+                     break
 
                 current_level = current_level[part]
-                if not isinstance(current_level, dict):
-                    app.logger.warning(f"Configuration conflict in line: '{line}'. Path is obstructed.")
-                    break # Cannot go deeper
-
         return config_dict
 
 
@@ -199,10 +193,23 @@ class VersaConfigParser:
                         'name': 'snmp',
                         'communities': list(communities.keys())
                     })
-            
+                if services.get('ssh', {}).get('port'):
+                    normalized_data['system_services'].append({
+                        'name': 'ssh',
+                        'port': services['ssh']['port'].get('__value__')
+                    })
+                if cli_config.get('system', {}).get('name-servers'):
+                    normalized_data['system_services'].append({'name': 'dns', 'configured': True})
+
             # Map system login settings
-            if cli_config.get('system', {}).get('login', {}).get('password', {}).get('complexity'):
-                normalized_data['system_services'].append({'name': 'password-complexity', 'enabled': True})
+            if cli_config.get('system', {}).get('login', {}):
+                login_settings = cli_config['system']['login']
+                if login_settings.get('password', {}).get('complexity'):
+                    normalized_data['system_services'].append({'name': 'password-complexity', 'enabled': True})
+                if login_settings.get('user'):
+                    for user, user_data in login_settings.get('user').items():
+                        if user_data.get('authentication', {}).get('max-attempts'):
+                             normalized_data['system_services'].append({'name': 'login-attempts', 'configured': True})
 
             # Map security policies
             if cli_config.get('security', {}).get('policy'):
@@ -215,10 +222,12 @@ class VersaConfigParser:
                             if not isinstance(rule_data, dict): continue
                             rule_list.append({
                                 'id': rule_id,
-                                'source': rule_data.get('source', 'any'),
-                                'destination': rule_data.get('destination', 'any'),
-                                'service': rule_data.get('service', 'any'),
-                                'action': rule_data.get('then', {}).get('action', 'permit'),
+                                'source': rule_data.get('source', {}).get('__value__', 'any'),
+                                'destination': rule_data.get('destination', {}).get('__value__', 'any'),
+                                'source-zone': rule_data.get('source-zone', {}).get('__value__'),
+                                'destination-zone': rule_data.get('destination-zone', {}).get('__value__'),
+                                'service': rule_data.get('service', {}).get('__value__', 'any'),
+                                'action': rule_data.get('then', {}).get('action', {}).get('__value__', 'permit'),
                                 'log': 'log' in rule_data.get('then', {})
                             })
                     normalized_data['security_policies'].append({'name': policy_name, 'rules': rule_list})
@@ -334,7 +343,7 @@ def view_report(report_name):
     return send_from_directory(REPORTS_DIR, report_name)
 
 def get_severity_counts(findings):
-    counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0}
+    counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'WARNING': 0, 'LOW': 0}
     for finding in findings:
         severity = finding.get('severity', 'LOW').upper()
         if severity in counts:

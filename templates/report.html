@@ -14,6 +14,7 @@
         .summary-box.critical { background-color: #dc3545; }
         .summary-box.high { background-color: #fd7e14; }
         .summary-box.medium { background-color: #ffc107; }
+        .summary-box.warning { background-color: #ffc107; }
         .summary-box.low { background-color: #17a2b8; }
         .summary-box.total { background-color: #6c757d; }
         .summary-box.info { background-color: #17a2b8; }
@@ -21,11 +22,13 @@
         .finding.CRITICAL { border-left-color: #dc3545; }
         .finding.HIGH { border-left-color: #fd7e14; }
         .finding.MEDIUM { border-left-color: #ffc107; }
+        .finding.WARNING { border-left-color: #ffc107; }
         .finding.LOW { border-left-color: #17a2b8; }
         .finding-header { font-weight: bold; font-size: 1.1em; }
         .severity-critical { color: #dc3545; }
         .severity-high { color: #fd7e14; }
         .severity-medium { color: #ffc107; }
+        .severity-warning { color: #ffc107; }
         .severity-low { color: #17a2b8; }
         .finding-details { margin-top: 10px; background-color: #f9f9f9; padding: 10px; border-radius: 4px; }
         .finding-details p { margin: 5px 0; }
@@ -68,6 +71,10 @@
             <div class="summary-box medium">
                 <h3>{{ severity_counts.MEDIUM }}</h3>
                 <p>Medium</p>
+            </div>
+            <div class="summary-box warning">
+                <h3>{{ severity_counts.WARNING }}</h3>
+                <p>Warning</p>
             </div>
             <div class="summary-box low">
                 <h3>{{ severity_counts.LOW }}</h3>

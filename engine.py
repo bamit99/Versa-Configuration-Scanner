@@ -91,5 +91,29 @@ class RuleEngine:
         if 'VOS-AUTH-001' in self.rules and not any(service.get('name') == 'password-complexity' and service.get('enabled') for service in normalized_config.get('system_services', [])):
             self._add_finding('VOS-AUTH-001')
 
+        # RULE_ID: VOS-FW-003
+        if 'VOS-FW-003' in self.rules:
+            for policy in normalized_config.get('security_policies', []):
+                for rule in policy.get('rules', []):
+                    action = rule.get('action', 'permit')
+                    source_zone = rule.get('source-zone')
+                    dest_zone = rule.get('destination-zone')
+                    if action == 'permit' and (not source_zone or not dest_zone):
+                        self._add_finding('VOS-FW-003', affected_config_params={'policy_name': policy.get('name'), 'rule_id': rule.get('id')})
+        
+        # RULE_ID: VOS-MGT-006
+        if 'VOS-MGT-006' in self.rules:
+            for service in normalized_config.get('system_services', []):
+                if service.get('name') == 'ssh' and service.get('port') == '22':
+                    self._add_finding('VOS-MGT-006')
+
+        # RULE_ID: VOS-SYS-002
+        if 'VOS-SYS-002' in self.rules and not any(service.get('name') == 'dns' and service.get('configured') for service in normalized_config.get('system_services', [])):
+            self._add_finding('VOS-SYS-002')
+
+        # RULE_ID: VOS-AUTH-006
+        if 'VOS-AUTH-006' in self.rules and not any(service.get('name') == 'login-attempts' and service.get('configured') for service in normalized_config.get('system_services', [])):
+            self._add_finding('VOS-AUTH-006')
+
         app.logger.info(f"Evaluated {len(self.rules)} rules, found {len(self.findings)} findings.")
         return self.findings
