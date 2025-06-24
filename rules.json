@@ -1,0 +1,317 @@
+[
+    {
+        "id": "VOS-MGT-001",
+        "severity": "CRITICAL",
+        "description": "Ensure Telnet is disabled for all VOS appliances.",
+        "details": "Telnet is an insecure protocol that transmits data in cleartext, making it vulnerable to eavesdropping. It should be disabled in favor of secure alternatives like SSH.",
+        "affected_config_template": "System Services"
+    },
+    {
+        "id": "VOS-MGT-002",
+        "severity": "HIGH",
+        "description": "Ensure HTTP web management is disabled and only HTTPS is enabled.",
+        "details": "HTTP transmits management credentials and data in cleartext. Only HTTPS should be used to ensure encrypted management sessions.",
+        "affected_config_template": "System Services: Web Management"
+    },
+    {
+        "id": "VOS-FW-001",
+        "severity": "CRITICAL",
+        "description": "Identify any firewall rules with 'source any', 'destination any', and 'service any'.",
+        "details": "Overly permissive firewall rules (any/any/any) can expose the network to significant risks by allowing unintended traffic. All rules should be as specific as possible.",
+        "affected_config_template": "Security Policy: {policy_name}, Rule: {rule_id}"
+    },
+    {
+        "id": "VOS-FW-002",
+        "severity": "HIGH",
+        "description": "Ensure all security policies have logging enabled for deny/reject actions.",
+        "details": "Logging denied or rejected traffic is crucial for security monitoring, incident response, and troubleshooting. Without logs, it's impossible to know what traffic is being blocked.",
+        "affected_config_template": "Security Policy: {policy_name}, Rule: {rule_id}"
+    },
+    {
+        "id": "VOS-SYS-001",
+        "severity": "MEDIUM",
+        "description": "NTP service is not configured or synchronized.",
+        "details": "Network Time Protocol (NTP) is critical for synchronizing device clocks. Accurate time is essential for log correlation, certificate validation, and troubleshooting across devices.",
+        "affected_config_template": "System Services: NTP"
+    },
+    {
+        "id": "VOS-MGT-003",
+        "severity": "HIGH",
+        "description": "SNMP is configured with default community strings ('public' or 'private').",
+        "details": "Default SNMP community strings are well-known and allow unauthorized users to gain information about the device. They must be changed to strong, unique values.",
+        "affected_config_template": "System Services: SNMP, Community: {community_name}"
+    },
+    {
+        "id": "VOS-AUTH-001",
+        "severity": "MEDIUM",
+        "description": "Local user password complexity is not enforced.",
+        "details": "Enforcing password complexity (length, character types) for local user accounts makes them more resistant to brute-force attacks.",
+        "affected_config_template": "System: Login"
+    },
+    {
+        "id": "VOS-MGT-004",
+        "severity": "CRITICAL",
+        "description": "Ensure management plane SSL certificates are from a trusted Public CA and not self-signed.",
+        "details": "Self-signed certificates are not inherently trusted and can facilitate Man-in-the-Middle attacks. Use trusted CA-signed certificates for all production management interfaces.",
+        "affected_config_template": "System Services: SSL/TLS"
+    },
+    {
+        "id": "VOS-MGT-005",
+        "severity": "HIGH",
+        "description": "Verify SSL certificate private key length is at least 2048-bit.",
+        "details": "Shorter key lengths are susceptible to brute-force attacks. 2048-bit or higher keys provide stronger cryptographic security.",
+        "affected_config_template": "System Services: SSL/TLS"
+    },
+    {
+        "id": "VOS-AUTH-002",
+        "severity": "CRITICAL",
+        "description": "Eliminate all default system, administrative, and component credentials.",
+        "details": "Default credentials are a common attack vector and must be changed immediately upon deployment to strong, unique passwords.",
+        "affected_config_template": "System: User Accounts, Component: {component_name}"
+    },
+    {
+        "id": "VOS-AUTH-003",
+        "severity": "HIGH",
+        "description": "Enforce mandatory password reset on first login for all user accounts.",
+        "details": "Ensures that temporary or default passwords are not retained, reducing the risk of unauthorized access.",
+        "affected_config_template": "System: Login, User Policy"
+    },
+    {
+        "id": "VOS-AUTH-004",
+        "severity": "MEDIUM",
+        "description": "Enforce password expiration policy (e.g., every 90 days).",
+        "details": "Regular password changes reduce the window of opportunity for compromised credentials to be exploited.",
+        "affected_config_template": "System: Login, User Policy"
+    },
+    {
+        "id": "VOS-AUTH-005",
+        "severity": "MEDIUM",
+        "description": "Implement password history checks to prevent reuse of recent passwords.",
+        "details": "Prevents users from cycling through a small set of old passwords, making brute-force or dictionary attacks harder.",
+        "affected_config_template": "System: Login, User Policy"
+    },
+    {
+        "id": "VOS-AUTH-006",
+        "severity": "HIGH",
+        "description": "Configure user login attempt limits and account lockout duration to prevent brute-force attacks.",
+        "details": "Limits the number of failed login attempts before an account is temporarily locked, mitigating brute-force password guessing.",
+        "affected_config_template": "System: Login, Security"
+    },
+    {
+        "id": "VOS-MGT-006",
+        "severity": "MEDIUM",
+        "description": "Change default SSH port (22) to a non-standard port.",
+        "details": "Changing the default SSH port reduces automated scanning attempts and reconnaissance by attackers.",
+        "affected_config_template": "System Services: SSH"
+    },
+    {
+        "id": "VOS-MGT-007",
+        "severity": "MEDIUM",
+        "description": "Harden SSH server `ClientAliveInterval` and `ClientAliveCountMax` to prevent idle sessions.",
+        "details": "Configuring these parameters ensures idle SSH sessions are terminated, reducing the risk of unauthorized access to unattended sessions.",
+        "affected_config_template": "System Services: SSH"
+    },
+    {
+        "id": "VOS-MGT-008",
+        "severity": "HIGH",
+        "description": "Ensure strong SSH cryptographic algorithms (ciphers, MACs, Kex) are used.",
+        "details": "Weak or outdated cryptographic algorithms in SSH can make connections vulnerable to eavesdropping and tampering. Only strong, modern algorithms should be allowed.",
+        "affected_config_template": "System Services: SSH"
+    },
+    {
+        "id": "VOS-MGT-009",
+        "severity": "MEDIUM",
+        "description": "Disable SSH server if not explicitly required for a device.",
+        "details": "Disabling unnecessary services reduces the attack surface and minimizes potential entry points for attackers.",
+        "affected_config_template": "System Services: SSH"
+    },
+    {
+        "id": "VOS-SYS-002",
+        "severity": "HIGH",
+        "description": "Ensure DNS servers are correctly configured for operational and security functions.",
+        "details": "Proper DNS configuration is essential for system updates, name resolution, and communication with external services, including security package downloads.",
+        "affected_config_template": "System Services: DNS"
+    },
+    {
+        "id": "VOS-SYS-003",
+        "severity": "MEDIUM",
+        "description": "Verify 'Secure Mode' is enabled to harden underlying Linux OS components per CIS benchmarks.",
+        "details": "Secure Mode applies hardened configurations to the Linux operating system, aligning with industry security best practices.",
+        "affected_config_template": "System: Secure Mode"
+    },
+    {
+        "id": "VOS-FW-003",
+        "severity": "CRITICAL",
+        "description": "Implement default-deny IP packet filtering rules (iptables) on management interfaces.",
+        "details": "A default-deny posture ensures that only explicitly allowed traffic can reach management interfaces, significantly reducing the attack surface.",
+        "affected_config_template": "System: IP Tables"
+    },
+    {
+        "id": "VOS-AUTH-007",
+        "severity": "CRITICAL",
+        "description": "Mandate centralized authentication integration (RADIUS, TACACS+, LDAP, Active Directory) and disable local authentication.",
+        "details": "Centralized authentication provides a single point of control for user access, simplifies management, and enables consistent policy enforcement.",
+        "affected_config_template": "Administration: Authentication"
+    },
+    {
+        "id": "VOS-AUTH-008",
+        "severity": "HIGH",
+        "description": "Verify proper Role-Based Access Control (RBAC) implementation ensuring least privilege.",
+        "details": "RBAC restricts users to only the permissions required for their job functions, limiting the potential impact of a compromised account.",
+        "affected_config_template": "Administration: User Management, Roles"
+    },
+    {
+        "id": "VOS-AUTH-009",
+        "severity": "HIGH",
+        "description": "Enforce Multi-Factor Authentication (MFA) for administrative access.",
+        "details": "MFA adds a critical layer of security beyond passwords, making it significantly harder for unauthorized users to gain access even if credentials are stolen.",
+        "affected_config_template": "Administration: MFA"
+    },
+    {
+        "id": "VOS-API-001",
+        "severity": "CRITICAL",
+        "description": "Prioritize Open Authorization (OAuth) tokens over basic authentication for REST API requests to Versa Director.",
+        "details": "OAuth provides a more secure, token-based authentication mechanism compared to basic authentication, which transmits credentials in a less secure manner.",
+        "affected_config_template": "System: API Management"
+    },
+    {
+        "id": "VOS-API-002",
+        "severity": "HIGH",
+        "description": "Configure API rate limits to prevent Denial of Service (DoS) attacks and abuse.",
+        "details": "Rate limiting protects API endpoints from excessive requests that could lead to performance degradation or denial of service.",
+        "affected_config_template": "System: API Management"
+    },
+    {
+        "id": "VOS-SEG-001",
+        "severity": "HIGH",
+        "description": "Verify correct Virtual Routing and Forwarding (VRF) assignments for Layer 3 isolation.",
+        "details": "VRFs provide network segmentation at Layer 3, preventing unauthorized lateral movement between different network segments.",
+        "affected_config_template": "Network: VRF Instances"
+    },
+    {
+        "id": "VOS-SEG-002",
+        "severity": "CRITICAL",
+        "description": "Ensure Zone-Based Firewalls (ZBFW) are properly defined and applied to all security zones.",
+        "details": "ZBFW is fundamental for controlling traffic flow between defined security zones and enforcing security policies at zone boundaries.",
+        "affected_config_template": "Security: Zones, Security Policy: Zone-Pair"
+    },
+    {
+        "id": "VOS-SEG-003",
+        "severity": "HIGH",
+        "description": "Implement micro-segmentation policies to enforce granular, least-privilege access for devices.",
+        "details": "Micro-segmentation limits communication between individual workloads or devices, significantly reducing the impact of breaches by preventing lateral movement.",
+        "affected_config_template": "Security: Micro-segmentation, Policy"
+    },
+    {
+        "id": "VOS-FW-004",
+        "severity": "CRITICAL",
+        "description": "Ensure Next Generation Firewall (NGFW) services are globally enabled and application-aware policies are in place.",
+        "details": "NGFW capabilities provide deep packet inspection and application-level control, which is essential for modern threat prevention.",
+        "affected_config_template": "Security: NGFW, Global Settings"
+    },
+    {
+        "id": "VOS-IPS-001",
+        "severity": "CRITICAL",
+        "description": "Enable Intrusion Prevention/Detection Systems (IPS/IDS) and configure comprehensive IPS profiles.",
+        "details": "IPS/IDS proactively detects and blocks known threats and malicious activities based on signatures and behavioral patterns.",
+        "affected_config_template": "Security: IPS/IDS, Profiles"
+    },
+    {
+        "id": "VOS-URL-001",
+        "severity": "HIGH",
+        "description": "Configure URL filtering policies with comprehensive deny/allow lists and appropriate actions.",
+        "details": "URL filtering controls access to web content, preventing access to malicious sites and enforcing acceptable use policies.",
+        "affected_config_template": "Security: URL Filtering, Policies"
+    },
+    {
+        "id": "VOS-AV-001",
+        "severity": "HIGH",
+        "description": "Enable native Anti-Virus/Anti-Malware and ensure real-time signature updates are configured.",
+        "details": "Real-time AV/Anti-Malware protection with up-to-date signatures is crucial for detecting and mitigating malware threats.",
+        "affected_config_template": "Security: Anti-Virus/Anti-Malware"
+    },
+    {
+        "id": "VOS-DLP-001",
+        "severity": "HIGH",
+        "description": "Enable and configure Data Loss Prevention (DLP) policies to protect sensitive data in transit.",
+        "details": "DLP prevents unauthorized exfiltration or leakage of sensitive information, ensuring compliance and data confidentiality.",
+        "affected_config_template": "Security: Data Loss Prevention, Policies"
+    },
+    {
+        "id": "VOS-VPN-001",
+        "severity": "CRITICAL",
+        "description": "Verify use of IETF Standard IPsec-based cryptography for SD-WAN VPN overlays.",
+        "details": "Ensures secure and interoperable encrypted tunnels for data transmission over public networks.",
+        "affected_config_template": "VPN: IPsec, Global Settings"
+    },
+    {
+        "id": "VOS-VPN-002",
+        "severity": "CRITICAL",
+        "description": "Mandate strong encryption algorithms (e.g., AES-256 with GCM) and robust hashing algorithms (e.g., SHA2-512) for IPsec.",
+        "details": "Use of strong, modern cryptographic algorithms is essential to protect the confidentiality and integrity of data within VPN tunnels.",
+        "affected_config_template": "VPN: IPsec, Crypto Profiles"
+    },
+    {
+        "id": "VOS-VPN-003",
+        "severity": "HIGH",
+        "description": "Enable automatic key management and certificate lifecycle management for IPsec tunnels, including key rotation.",
+        "details": "Automated key rotation limits the exposure window if a key is compromised, enhancing long-term security of VPN connections.",
+        "affected_config_template": "VPN: IPsec, Key Management"
+    },
+    {
+        "id": "VOS-COMP-001",
+        "severity": "HIGH",
+        "description": "Verify PCI-DSS specific controls are implemented (firewall for cardholder data, encryption for data in transit).",
+        "details": "Adherence to PCI-DSS requirements is critical for organizations handling cardholder data to prevent breaches and ensure compliance.",
+        "affected_config_template": "Security Policy, VPN"
+    },
+    {
+        "id": "VOS-COMP-002",
+        "severity": "HIGH",
+        "description": "Leverage FIPS 140-2 validated cryptographic modules for control and data plane cryptography.",
+        "details": "FIPS 140-2 compliance is required for government and highly regulated environments to ensure cryptographic components meet stringent security standards.",
+        "affected_config_template": "System: FIPS Mode, Crypto Profiles"
+    },
+    {
+        "id": "VOS-SYS-004",
+        "severity": "HIGH",
+        "description": "Enable regular and automatic updates for OS security packages (OS SPacks) and Versa-specific Security Packages (SPacks).",
+        "details": "Ensures the system receives the latest threat signatures and security patches to defend against emerging vulnerabilities and attacks.",
+        "affected_config_template": "System: Software Updates, SPacks"
+    },
+    {
+        "id": "VOS-SYS-005",
+        "severity": "HIGH",
+        "description": "Leverage UEFI Secure Boot to verify the integrity of software components from boot loader to kernel.",
+        "details": "Secure Boot prevents malicious software from being loaded during the boot process, protecting against rootkits and ensuring system integrity.",
+        "affected_config_template": "System: Boot Security"
+    },
+    {
+        "id": "VOS-LOG-001",
+        "severity": "HIGH",
+        "description": "Enable comprehensive logging for VOS features and services (access, IP-filtering, packet capture, SSL decryption).",
+        "details": "Detailed logs are essential for security monitoring, incident detection, troubleshooting, and forensic analysis.",
+        "affected_config_template": "System: Logging, Features"
+    },
+    {
+        "id": "VOS-LOG-002",
+        "severity": "CRITICAL",
+        "description": "Integrate with external syslog servers for centralized log consolidation and SIEM integration.",
+        "details": "Centralized logging facilitates efficient security monitoring, real-time alerting, and compliance reporting by aggregating logs from all devices.",
+        "affected_config_template": "System: Logging, Syslog"
+    },
+    {
+        "id": "VOS-LOG-003",
+        "severity": "HIGH",
+        "description": "Enable Versa Advanced Logging Service (ALS) for secure, streamed log integration with SIEM.",
+        "details": "ALS provides a robust mechanism for streaming high-volume, real-time event data to SIEM systems, which is crucial for comprehensive threat detection.",
+        "affected_config_template": "Analytics: Logging, ALS"
+    },
+    {
+        "id": "VOS-LOG-004",
+        "severity": "MEDIUM",
+        "description": "Ensure audit logs for all configuration changes and authentication attempts are enabled and reviewed.",
+        "details": "Audit logs provide an immutable record of administrative actions and login attempts, critical for accountability and detecting unauthorized activity.",
+        "affected_config_template": "System: Logging, Audit"
+    }
+]

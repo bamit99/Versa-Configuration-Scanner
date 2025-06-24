@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Report for {{ filename }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 1200px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2 { color: #0056b3; }
+        h1 { text-align: center; }
+        .summary { border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-around; text-align: center; }
+        .summary-box { padding: 10px 20px; border-radius: 5px; color: #fff; }
+        .summary-box.critical { background-color: #dc3545; }
+        .summary-box.high { background-color: #fd7e14; }
+        .summary-box.medium { background-color: #ffc107; }
+        .summary-box.low { background-color: #17a2b8; }
+        .summary-box.total { background-color: #6c757d; }
+        .summary-box.info { background-color: #17a2b8; }
+        .finding { border: 1px solid #ddd; border-left-width: 5px; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
+        .finding.CRITICAL { border-left-color: #dc3545; }
+        .finding.HIGH { border-left-color: #fd7e14; }
+        .finding.MEDIUM { border-left-color: #ffc107; }
+        .finding.LOW { border-left-color: #17a2b8; }
+        .finding-header { font-weight: bold; font-size: 1.1em; }
+        .severity-critical { color: #dc3545; }
+        .severity-high { color: #fd7e14; }
+        .severity-medium { color: #ffc107; }
+        .severity-low { color: #17a2b8; }
+        .finding-details { margin-top: 10px; background-color: #f9f9f9; padding: 10px; border-radius: 4px; }
+        .finding-details p { margin: 5px 0; }
+        .finding-details strong { color: #555; }
+        .no-findings { text-align: center; font-size: 1.2em; color: #28a745; padding: 20px; background-color: #e9f7ef; border: 1px solid #a3d9b1; border-radius: 5px; }
+        .footer { text-align: center; margin-top: 20px; font-size: 0.8em; color: #666; }
+        .download-btn { background-color: #28a745; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px; font-size: 0.9em; }
+        .download-btn:hover { background-color: #218838; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Audit Report</h1>
+        <p style="text-align:center;"><strong>File:</strong> {{ filename }}<br><strong>Report Generated:</strong> {{ now().strftime('%Y-%m-%d %H:%M:%S UTC') }}</p>
+
+        {% if csv_report_name %}
+        <div style="text-align: center; margin-bottom: 20px;">
+            <a href="{{ url_for('view_report', report_name=csv_report_name) }}" class="download-btn" download>Download Report as CSV</a>
+        </div>
+        {% endif %}
+
+        <h2>Summary</h2>
+        <div class="summary">
+            <div class="summary-box info">
+                <h3>{{ total_rules }}</h3>
+                <p>Rules Scanned</p>
+            </div>
+            <div class="summary-box total">
+                <h3>{{ total_findings }}</h3>
+                <p>Total Findings</p>
+            </div>
+            <div class="summary-box critical">
+                <h3>{{ severity_counts.CRITICAL }}</h3>
+                <p>Critical</p>
+            </div>
+            <div class="summary-box high">
+                <h3>{{ severity_counts.HIGH }}</h3>
+                <p>High</p>
+            </div>
+            <div class="summary-box medium">
+                <h3>{{ severity_counts.MEDIUM }}</h3>
+                <p>Medium</p>
+            </div>
+            <div class="summary-box low">
+                <h3>{{ severity_counts.LOW }}</h3>
+                <p>Low</p>
+            </div>
+        </div>
+
+        <h2>Findings</h2>
+        {% if findings %}
+            {% for finding in findings %}
+            <div class="finding {{ finding.severity }}">
+                <div class="finding-header">
+                    <span class="severity-{{ finding.severity.lower() }}">[{{ finding.severity }}]</span> {{ finding.description }}
+                </div>
+                <div class="finding-details">
+                    <p><strong>Rule ID:</strong> {{ finding.rule_id }}</p>
+                    <p><strong>Details:</strong> {{ finding.details }}</p>
+                    <p><strong>Affected Configuration:</strong> <code>{{ finding.affected_config }}</code></p>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-findings">
+                <p>🎉 No findings were identified. The configuration appears to be compliant with the checked rules.</p>
+            </div>
+        {% endif %}
+    </div>
+    <div class="footer">
+        <p>Versa Configuration Auditor</p>
+    </div>
+</body>
+</html>

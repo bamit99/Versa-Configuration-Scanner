@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+.env
+venv/
+.venv/
+
+# Uploads and Reports
+# Ignore all content within these directories
+uploads/*
+reports/*
+
+# But keep the directories themselves in the repo
+!uploads/.gitkeep
+!reports/.gitkeep
+
+# IDE / Editor specific
+.vscode/
+.idea/

@@ -1,0 +1,51 @@
+[
+    {
+        "id": "VOS-MGT-001",
+        "severity": "CRITICAL",
+        "description": "Ensure Telnet is disabled for all VOS appliances.",
+        "details": "Telnet is an insecure protocol that transmits data in cleartext, making it vulnerable to eavesdropping. It should be disabled in favor of secure alternatives like SSH.",
+        "affected_config_template": "System Services"
+    },
+    {
+        "id": "VOS-MGT-002",
+        "severity": "HIGH",
+        "description": "Ensure HTTP web management is disabled and only HTTPS is enabled.",
+        "details": "HTTP transmits management credentials and data in cleartext. Only HTTPS should be used to ensure encrypted management sessions.",
+        "affected_config_template": "System Services: Web Management"
+    },
+    {
+        "id": "VOS-FW-001",
+        "severity": "CRITICAL",
+        "description": "Identify any firewall rules with 'source any', 'destination any', and 'service any'.",
+        "details": "Overly permissive firewall rules (any/any/any) can expose the network to significant risks by allowing unintended traffic. All rules should be as specific as possible.",
+        "affected_config_template": "Security Policy: {policy_name}, Rule: {rule_id}"
+    },
+    {
+        "id": "VOS-FW-002",
+        "severity": "HIGH",
+        "description": "Ensure all security policies have logging enabled for deny/reject actions.",
+        "details": "Logging denied or rejected traffic is crucial for security monitoring, incident response, and troubleshooting. Without logs, it's impossible to know what traffic is being blocked.",
+        "affected_config_template": "Security Policy: {policy_name}, Rule: {rule_id}"
+    },
+    {
+        "id": "VOS-SYS-001",
+        "severity": "MEDIUM",
+        "description": "NTP service is not configured.",
+        "details": "Network Time Protocol (NTP) is critical for synchronizing device clocks. Accurate time is essential for log correlation, certificate validation, and troubleshooting.",
+        "affected_config_template": "System Services: NTP"
+    },
+    {
+        "id": "VOS-MGT-003",
+        "severity": "HIGH",
+        "description": "SNMP is configured with default community strings ('public' or 'private').",
+        "details": "Default SNMP community strings are well-known and allow unauthorized users to gain information about the device. They must be changed to strong, unique values.",
+        "affected_config_template": "System Services: SNMP, Community: {community_name}"
+    },
+    {
+        "id": "VOS-AUTH-001",
+        "severity": "MEDIUM",
+        "description": "Local user password complexity is not enforced.",
+        "details": "Enforcing password complexity (length, character types) for local user accounts makes them more resistant to brute-force attacks.",
+        "affected_config_template": "System: Login"
+    }
+]
