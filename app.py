@@ -372,10 +372,16 @@ def write_findings_to_csv(findings, original_filename, report_filepath):
 app.jinja_env.globals['now'] = datetime.datetime.utcnow
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description="Versa Configuration Auditor")
+    parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to bind to (e.g., 0.0.0.0 to listen on all interfaces)')
+    parser.add_argument('--port', type=int, default=5000, help='Port to listen on')
+    args = parser.parse_args()
+
     # To run this:
     # 1. IMPORTANT: This file must be named something other than 'code.py' (e.g., 'app.py') to avoid conflicts with Python's standard library.
     # 2. Create a folder named 'templates' in the same directory.
     # 3. Save the HTML content above as 'index.html' and 'report.html' inside the 'templates' folder.
-    # 4. Run from your terminal using the new filename (e.g., python app.py)
-    # 5. Open your web browser to http://127.0.0.1:5000/
-    app.run(debug=True)
+    # 4. Run from your terminal using the new filename (e.g., python app.py --host 0.0.0.0 --port 8080)
+    # 5. Open your web browser to the specified host and port.
+    app.run(host=args.host, port=args.port, debug=True)

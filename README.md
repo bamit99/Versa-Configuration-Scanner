@@ -57,8 +57,12 @@ This is a web-based tool to audit Versa Networks configuration files for securit
     ```bash
     python app.py
     ```
+    You can also specify the host and port. To make the application accessible on your local network, use:
+    ```bash
+    python app.py --host 0.0.0.0 --port 8080
+    ```
 
-5.  Open your web browser and navigate to `http://127.0.0.1:5000`.
+5.  Open your web browser and navigate to the host and port you specified (e.g., `http://127.0.0.1:5000` or `http://<your-lan-ip>:8080`).
 
 ## How to Extend
 
