@@ -9,12 +9,20 @@ from functools import wraps
 import csv
 import datetime
 from engine import RuleEngine, load_rules
+import threading
+import uuid
+import time # For simulating long-running tasks
 
 # --- Configuration ---
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'txt', 'json', 'xml', 'cli'} # Add more if needed
 CONFIG_DIR = 'configs' # Directory to store parsed configs
 REPORTS_DIR = 'reports' # Directory for generated reports
+
+# In-memory store for tasks
+# Structure: {task_id: {'status': 'pending/running/completed/failed', 'report_url': None, 'findings': None, 'filename': None, 'error': None}}
+tasks = {}
+task_lock = threading.Lock()
 
 # Ensure directories exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -280,44 +288,70 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """Handles file upload and initiates parsing and auditing."""
+    """Handles file upload, saves it, and initiates a background scan task."""
     if 'file' not in request.files:
-        flash('No file part in the request.', 'error')
-        return redirect(url_for('index'))
+        return {'error': 'No file part in the request.'}, 400
     file = request.files['file']
     if file.filename == '':
-        flash('No file selected for uploading.', 'warning')
-        return redirect(url_for('index'))
+        return {'error': 'No file selected for uploading.'}, 400
 
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
-        # Process the uploaded file
-        parser = VersaConfigParser()
-        parsed_data = parser.load_config(filepath)
+        task_id = str(uuid.uuid4())
+        with task_lock:
+            tasks[task_id] = {
+                'status': 'uploaded',
+                'filename': filename,
+                'filepath': filepath,
+                'report_url': None,
+                'findings': None,
+                'error': None
+            }
+        app.logger.info(f"File '{filename}' uploaded. Task ID: {task_id}")
+        return {'task_id': task_id, 'message': 'File uploaded successfully, awaiting scan initiation.'}, 202
+    else:
+        return {'error': 'Invalid file type. Please upload .txt, .json, .xml, or .cli files.'}, 400
 
-        if not parsed_data:
-            flash(f"Could not parse the configuration file '{filename}'. Please ensure it is a valid and supported format (JSON, XML, or Versa CLI).", 'error')
-            return redirect(url_for('index'))
+def run_scan_task(task_id):
+    """Performs the actual configuration parsing and auditing in a background thread."""
+    with app.app_context(): # Needed to use Flask's app.logger and render_template
+        with task_lock:
+            task = tasks.get(task_id)
+            if not task:
+                app.logger.error(f"Task {task_id} not found for scanning.")
+                return
 
-        normalized_config = parser.normalize_configuration()
+            if task['status'] != 'uploaded':
+                app.logger.warning(f"Scan for task {task_id} already initiated or completed.")
+                return
 
-        # Load rules and perform audit
-        rules = load_rules()
-        rule_engine = RuleEngine(rules)
-        findings = rule_engine.evaluate(normalized_config)
+            task['status'] = 'running'
+            app.logger.info(f"Starting scan for task {task_id} (file: {task['filename']})...")
 
-        # Save findings for reporting (e.g., in session or a temporary file)
-        # For simplicity, we'll pass them to the report template directly.
-        # In a real app, you might save to a database or session.
-        report_filename = f"audit_report_{filename}.html"
-        report_filepath = os.path.join(REPORTS_DIR, report_filename)
-
-        # Generate HTML and CSV reports
-        csv_report_name = write_findings_to_csv(findings, filename, report_filepath)
         try:
+            filepath = task['filepath']
+            filename = task['filename']
+
+            parser = VersaConfigParser()
+            parsed_data = parser.load_config(filepath)
+
+            if not parsed_data:
+                raise ValueError(f"Could not parse the configuration file '{filename}'. Please ensure it is a valid and supported format (JSON, XML, or Versa CLI).")
+
+            normalized_config = parser.normalize_configuration()
+
+            rules = load_rules()
+            rule_engine = RuleEngine(rules)
+            findings = rule_engine.evaluate(normalized_config)
+
+            report_filename = f"audit_report_{filename}_{task_id}.html"
+            report_filepath = os.path.join(REPORTS_DIR, report_filename)
+
+            csv_report_name = write_findings_to_csv(findings, filename, report_filepath)
+            
             with open(report_filepath, 'w', encoding='utf-8') as rf:
                 rf.write(render_template('report.html',
                                           filename=filename,
@@ -326,16 +360,53 @@ def upload_file():
                                           total_findings=len(findings),
                                           total_rules=len(rules),
                                           csv_report_name=csv_report_name))
+
+            with task_lock:
+                task['status'] = 'completed'
+                task['report_name'] = report_filename # Store only the filename
+                task['findings'] = findings # Store findings if needed for other purposes
+                app.logger.info(f"Scan for task {task_id} completed. Report filename: {task['report_name']}")
+
         except Exception as e:
-            app.logger.error(f"Error generating report: {e}")
-            return "Error generating report.", 500
+            with task_lock:
+                task['status'] = 'failed'
+                task['error'] = str(e)
+                app.logger.error(f"Scan for task {task_id} failed: {e}")
 
-        # Redirect to view the report
-        return redirect(url_for('view_report', report_name=report_filename))
+@app.route('/scan/<task_id>', methods=['POST'])
+def initiate_scan(task_id):
+    """Initiates the background scan for a given task ID."""
+    with task_lock:
+        task = tasks.get(task_id)
+        if not task:
+            return {'error': 'Task not found.'}, 404
+        if task['status'] != 'uploaded':
+            return {'error': f"Scan for task {task_id} is already {task['status']}."}, 409
+    
+    # Start the scan in a new thread
+    thread = threading.Thread(target=run_scan_task, args=(task_id,))
+    thread.start()
+    return {'message': 'Scan initiated.', 'task_id': task_id}, 202
 
-    else:
-        flash('Invalid file type. Please upload .txt, .json, .xml, or .cli files.', 'error')
-        return redirect(url_for('index'))
+@app.route('/status/<task_id>', methods=['GET'])
+def get_scan_status(task_id):
+    """Returns the current status of a scan task."""
+    with task_lock:
+        task = tasks.get(task_id)
+        if not task:
+            return {'error': 'Task not found.'}, 404
+        
+        response_data = {
+            'task_id': task_id,
+            'status': task['status'],
+            'filename': task['filename']
+        }
+        if task['status'] == 'completed':
+            response_data['report_name'] = task['report_name'] # Send the report name
+        elif task['status'] == 'failed':
+            response_data['error'] = task['error']
+        
+        return response_data, 200
 
 @app.route('/reports/<report_name>')
 def view_report(report_name):

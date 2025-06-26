@@ -1,317 +1,795 @@
 [
     {
         "id": "VOS-MGT-001",
+        "name": "Telnet Service Enabled",
         "severity": "CRITICAL",
-        "description": "Ensure Telnet is disabled for all VOS appliances.",
-        "details": "Telnet is an insecure protocol that transmits data in cleartext, making it vulnerable to eavesdropping. It should be disabled in favor of secure alternatives like SSH.",
-        "affected_config_template": "System Services"
+        "description": "Telnet is an insecure protocol and should be disabled.",
+        "details": "Telnet transmits data, including credentials, in plaintext, making it vulnerable to eavesdropping and man-in-the-middle attacks. Use SSH instead.",
+        "affected_config_template": "System service telnet enabled.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.name", "operator": "equals", "value": "telnet" },
+                        { "target": "service.enabled", "operator": "equals", "value": true }
+                    ]
+                },
+                "affected_params": {
+                    "service_name": "service.name"
+                }
+            }
+        }
     },
     {
         "id": "VOS-MGT-002",
+        "name": "Web Management HTTP Enabled",
         "severity": "HIGH",
-        "description": "Ensure HTTP web management is disabled and only HTTPS is enabled.",
-        "details": "HTTP transmits management credentials and data in cleartext. Only HTTPS should be used to ensure encrypted management sessions.",
-        "affected_config_template": "System Services: Web Management"
+        "description": "Web management should only be accessible via HTTPS.",
+        "details": "HTTP transmits data in plaintext. Ensure web management is configured to use HTTPS for secure communication.",
+        "affected_config_template": "System service web-management HTTP enabled.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.name", "operator": "equals", "value": "web-management" },
+                        { "target": "service.http_enabled", "operator": "equals", "value": true }
+                    ]
+                },
+                "affected_params": {
+                    "service_name": "service.name"
+                }
+            }
+        }
     },
     {
         "id": "VOS-FW-001",
+        "name": "Any-Any-Any Security Policy Rule",
         "severity": "CRITICAL",
-        "description": "Identify any firewall rules with 'source any', 'destination any', and 'service any'.",
-        "details": "Overly permissive firewall rules (any/any/any) can expose the network to significant risks by allowing unintended traffic. All rules should be as specific as possible.",
-        "affected_config_template": "Security Policy: {policy_name}, Rule: {rule_id}"
+        "description": "Security policy rules should be specific and avoid 'any' for source, destination, and service.",
+        "details": "An 'any-any-any' rule allows all traffic, which is a significant security risk. Restrict traffic to only what is necessary.",
+        "affected_config_template": "Security policy '{policy_name}' rule '{rule_id}' allows any-any-any.",
+        "check": {
+            "operator": "for_each",
+            "target": "security_policies",
+            "item_var": "policy",
+            "inner_check": {
+                "operator": "for_each",
+                "target": "policy.rules",
+                "item_var": "rule",
+                "inner_check": {
+                    "condition": {
+                        "operator": "and",
+                        "conditions": [
+                            { "target": "rule.source", "operator": "equals", "value": "any" },
+                            { "target": "rule.destination", "operator": "equals", "value": "any" },
+                            { "target": "rule.service", "operator": "equals", "value": "any" }
+                        ]
+                    },
+                    "affected_params": {
+                        "policy_name": "policy.name",
+                        "rule_id": "rule.id"
+                    }
+                }
+            }
+        }
     },
     {
         "id": "VOS-FW-002",
+        "name": "Deny/Reject Rules Without Logging",
         "severity": "HIGH",
-        "description": "Ensure all security policies have logging enabled for deny/reject actions.",
-        "details": "Logging denied or rejected traffic is crucial for security monitoring, incident response, and troubleshooting. Without logs, it's impossible to know what traffic is being blocked.",
-        "affected_config_template": "Security Policy: {policy_name}, Rule: {rule_id}"
+        "description": "Deny or reject security policy rules should always log traffic.",
+        "details": "Logging denied or rejected traffic is crucial for security monitoring, incident response, and identifying potential attacks or misconfigurations.",
+        "affected_config_template": "Security policy '{policy_name}' rule '{rule_id}' is deny/reject but not logging.",
+        "check": {
+            "operator": "for_each",
+            "target": "security_policies",
+            "item_var": "policy",
+            "inner_check": {
+                "operator": "for_each",
+                "target": "policy.rules",
+                "item_var": "rule",
+                "inner_check": {
+                    "condition": {
+                        "operator": "and",
+                        "conditions": [
+                            { "target": "rule.action", "operator": "in", "value": ["deny", "reject"] },
+                            { "target": "rule.log", "operator": "equals", "value": false }
+                        ]
+                    },
+                    "affected_params": {
+                        "policy_name": "policy.name",
+                        "rule_id": "rule.id"
+                    }
+                }
+            }
+        }
     },
     {
         "id": "VOS-SYS-001",
+        "name": "NTP Service Not Configured",
         "severity": "MEDIUM",
-        "description": "NTP service is not configured or synchronized.",
-        "details": "Network Time Protocol (NTP) is critical for synchronizing device clocks. Accurate time is essential for log correlation, certificate validation, and troubleshooting across devices.",
-        "affected_config_template": "System Services: NTP"
+        "description": "NTP (Network Time Protocol) should be configured for accurate time synchronization.",
+        "details": "Accurate time is critical for logging, troubleshooting, and security event correlation. Ensure NTP servers are configured and reachable.",
+        "affected_config_template": "NTP service not configured.",
+        "check": {
+            "operator": "not_contains_item",
+            "target": "system_services",
+            "value": {
+                "name": "ntp",
+                "configured": true
+            }
+        }
     },
     {
         "id": "VOS-MGT-003",
+        "name": "SNMP Community Strings 'public' or 'private'",
         "severity": "HIGH",
-        "description": "SNMP is configured with default community strings ('public' or 'private').",
-        "details": "Default SNMP community strings are well-known and allow unauthorized users to gain information about the device. They must be changed to strong, unique values.",
-        "affected_config_template": "System Services: SNMP, Community: {community_name}"
-    },
-    {
-        "id": "VOS-AUTH-001",
-        "severity": "MEDIUM",
-        "description": "Local user password complexity is not enforced.",
-        "details": "Enforcing password complexity (length, character types) for local user accounts makes them more resistant to brute-force attacks.",
-        "affected_config_template": "System: Login"
-    },
-    {
-        "id": "VOS-MGT-004",
-        "severity": "CRITICAL",
-        "description": "Ensure management plane SSL certificates are from a trusted Public CA and not self-signed.",
-        "details": "Self-signed certificates are not inherently trusted and can facilitate Man-in-the-Middle attacks. Use trusted CA-signed certificates for all production management interfaces.",
-        "affected_config_template": "System Services: SSL/TLS"
-    },
-    {
-        "id": "VOS-MGT-005",
-        "severity": "HIGH",
-        "description": "Verify SSL certificate private key length is at least 2048-bit.",
-        "details": "Shorter key lengths are susceptible to brute-force attacks. 2048-bit or higher keys provide stronger cryptographic security.",
-        "affected_config_template": "System Services: SSL/TLS"
-    },
-    {
-        "id": "VOS-AUTH-002",
-        "severity": "CRITICAL",
-        "description": "Eliminate all default system, administrative, and component credentials.",
-        "details": "Default credentials are a common attack vector and must be changed immediately upon deployment to strong, unique passwords.",
-        "affected_config_template": "System: User Accounts, Component: {component_name}"
-    },
-    {
-        "id": "VOS-AUTH-003",
-        "severity": "HIGH",
-        "description": "Enforce mandatory password reset on first login for all user accounts.",
-        "details": "Ensures that temporary or default passwords are not retained, reducing the risk of unauthorized access.",
-        "affected_config_template": "System: Login, User Policy"
-    },
-    {
-        "id": "VOS-AUTH-004",
-        "severity": "MEDIUM",
-        "description": "Enforce password expiration policy (e.g., every 90 days).",
-        "details": "Regular password changes reduce the window of opportunity for compromised credentials to be exploited.",
-        "affected_config_template": "System: Login, User Policy"
-    },
-    {
-        "id": "VOS-AUTH-005",
-        "severity": "MEDIUM",
-        "description": "Implement password history checks to prevent reuse of recent passwords.",
-        "details": "Prevents users from cycling through a small set of old passwords, making brute-force or dictionary attacks harder.",
-        "affected_config_template": "System: Login, User Policy"
-    },
-    {
-        "id": "VOS-AUTH-006",
-        "severity": "HIGH",
-        "description": "Configure user login attempt limits and account lockout duration to prevent brute-force attacks.",
-        "details": "Limits the number of failed login attempts before an account is temporarily locked, mitigating brute-force password guessing.",
-        "affected_config_template": "System: Login, Security"
+        "description": "Default or well-known SNMP community strings ('public', 'private') should not be used.",
+        "details": "These community strings are easily guessable and can allow unauthorized access to device information. Use strong, unique community strings.",
+        "affected_config_template": "SNMP community string '{community_name}' found.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.name", "operator": "equals", "value": "snmp" },
+                        { "target": "service.communities", "operator": "contains", "value": "public" }
+                    ]
+                },
+                "affected_params": {
+                    "community_name": "service.communities"
+                }
+            }
+        }
     },
     {
         "id": "VOS-MGT-006",
+        "name": "SSH Default Port (22) Used",
+        "severity": "LOW",
+        "description": "SSH should not use the default port (22) to reduce automated scanning attempts.",
+        "details": "Changing the default SSH port is a basic security hardening measure to reduce noise from automated attacks. Use a high, non-standard port.",
+        "affected_config_template": "SSH configured on default port 22.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.name", "operator": "equals", "value": "ssh" },
+                        { "target": "service.port", "operator": "equals", "value": "22" }
+                    ]
+                },
+                "affected_params": {
+                    "service_name": "service.name",
+                    "port": "service.port"
+                }
+            }
+        }
+    },
+    {
+        "id": "VOS-MGT-004",
+        "name": "Self-signed SSL Certificates",
+        "severity": "CRITICAL",
+        "description": "Ensure management plane SSL certificates are from a trusted Public CA and not self-signed.",
+        "details": "Self-signed certificates are not inherently trusted and can facilitate Man-in-the-Middle attacks. Use trusted CA-signed certificates for all production management interfaces.",
+        "affected_config_template": "System Services: SSL/TLS certificate is self-signed.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.name", "operator": "equals", "value": "ssl" },
+                        { "target": "service.certificate_type", "operator": "equals", "value": "self-signed" }
+                    ]
+                },
+                "affected_params": {
+                    "service_name": "service.name"
+                }
+            }
+        }
+    },
+    {
+        "id": "VOS-MGT-005",
+        "name": "Weak SSL Certificate Private Key Length",
+        "severity": "HIGH",
+        "description": "Verify SSL certificate private key length is at least 2048-bit.",
+        "details": "Shorter key lengths are susceptible to brute-force attacks. 2048-bit or higher keys provide stronger cryptographic security.",
+        "affected_config_template": "System Services: SSL/TLS private key length is {key_length}-bit.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.name", "operator": "equals", "value": "ssl" },
+                        { "target": "service.key_length", "operator": "is_present", "value": true },
+                        { "target": "service.key_length", "operator": "less_than", "value": 2048 }
+                    ]
+                },
+                "affected_params": {
+                    "service_name": "service.name",
+                    "key_length": "service.key_length"
+                }
+            }
+        }
+    },
+    {
+        "id": "VOS-AUTH-002",
+        "name": "Default Credentials Present",
+        "severity": "CRITICAL",
+        "description": "Eliminate all default system, administrative, and component credentials.",
+        "details": "Default credentials are a common attack vector and must be changed immediately upon deployment to strong, unique passwords.",
+        "affected_config_template": "System: User Accounts, Component: {component_name} has default credentials.",
+        "check": {
+            "operator": "for_each",
+            "target": "user_auth_profiles",
+            "item_var": "profile",
+            "inner_check": {
+                "condition": {
+                    "target": "profile.default_credentials_present",
+                    "operator": "equals",
+                    "value": true
+                },
+                "affected_params": {
+                    "component_name": "profile.component_name"
+                }
+            }
+        }
+    },
+    {
+        "id": "VOS-AUTH-003",
+        "name": "Mandatory Password Reset Not Enforced",
+        "severity": "HIGH",
+        "description": "Enforce mandatory password reset on first login for all user accounts.",
+        "details": "Ensures that temporary or default passwords are not retained, reducing the risk of unauthorized access.",
+        "affected_config_template": "System: Login, User Policy: Mandatory password reset on first login not enforced.",
+        "check": {
+            "operator": "not_contains_item",
+            "target": "system_services",
+            "value": {
+                "name": "login",
+                "password_reset_on_first_login_enabled": true
+            }
+        }
+    },
+    {
+        "id": "VOS-AUTH-004",
+        "name": "Password Expiration Policy Not Enforced",
         "severity": "MEDIUM",
-        "description": "Change default SSH port (22) to a non-standard port.",
-        "details": "Changing the default SSH port reduces automated scanning attempts and reconnaissance by attackers.",
-        "affected_config_template": "System Services: SSH"
+        "description": "Enforce password expiration policy (e.g., every 90 days).",
+        "details": "Regular password changes reduce the window of opportunity for compromised credentials to be exploited.",
+        "affected_config_template": "System: Login, User Policy: Password expiration policy not enforced.",
+        "check": {
+            "operator": "not_contains_item",
+            "target": "system_services",
+            "value": {
+                "name": "login",
+                "password_expiration_enabled": true,
+                "password_expiration_days": { "operator": "greater_than", "value": 0 }
+            }
+        }
+    },
+    {
+        "id": "VOS-AUTH-005",
+        "name": "Password History Not Implemented",
+        "severity": "MEDIUM",
+        "description": "Implement password history checks to prevent reuse of recent passwords.",
+        "details": "Prevents users from cycling through a small set of old passwords, making brute-force or dictionary attacks harder.",
+        "affected_config_template": "System: Login, User Policy: Password history checks not implemented.",
+        "check": {
+            "operator": "not_contains_item",
+            "target": "system_services",
+            "value": {
+                "name": "login",
+                "password_history_enabled": true
+            }
+        }
+    },
+    {
+        "id": "VOS-AUTH-006",
+        "name": "Login Attempt Limits Not Configured",
+        "severity": "HIGH",
+        "description": "Configure user login attempt limits and account lockout duration to prevent brute-force attacks.",
+        "details": "Limits the number of failed login attempts before an account is temporarily locked, mitigating brute-force password guessing.",
+        "affected_config_template": "System: Login, Security: Login attempt limits or account lockout not configured.",
+        "check": {
+            "operator": "not_contains_item",
+            "target": "system_services",
+            "value": {
+                "name": "login",
+                "login_attempt_limits_configured": true,
+                "account_lockout_duration_configured": true
+            }
+        }
     },
     {
         "id": "VOS-MGT-007",
+        "name": "SSH Idle Session Hardening Missing",
         "severity": "MEDIUM",
         "description": "Harden SSH server `ClientAliveInterval` and `ClientAliveCountMax` to prevent idle sessions.",
         "details": "Configuring these parameters ensures idle SSH sessions are terminated, reducing the risk of unauthorized access to unattended sessions.",
-        "affected_config_template": "System Services: SSH"
+        "affected_config_template": "System Services: SSH idle session parameters not hardened.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.name", "operator": "equals", "value": "ssh" },
+                        { "operator": "or",
+                            "conditions": [
+                                { "target": "service.client_alive_interval_configured", "operator": "equals", "value": false },
+                                { "target": "service.client_alive_count_max_configured", "operator": "equals", "value": false }
+                            ]
+                        }
+                    ]
+                },
+                "affected_params": {
+                    "service_name": "service.name"
+                }
+            }
+        }
     },
     {
         "id": "VOS-MGT-008",
+        "name": "Weak SSH Cryptographic Algorithms Used",
         "severity": "HIGH",
         "description": "Ensure strong SSH cryptographic algorithms (ciphers, MACs, Kex) are used.",
         "details": "Weak or outdated cryptographic algorithms in SSH can make connections vulnerable to eavesdropping and tampering. Only strong, modern algorithms should be allowed.",
-        "affected_config_template": "System Services: SSH"
+        "affected_config_template": "System Services: SSH uses weak cryptographic algorithms.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.name", "operator": "equals", "value": "ssh" },
+                        { "target": "service.weak_crypto_algorithms_present", "operator": "equals", "value": true }
+                    ]
+                },
+                "affected_params": {
+                    "service_name": "service.name"
+                }
+            }
+        }
     },
     {
         "id": "VOS-MGT-009",
+        "name": "SSH Server Enabled Unnecessarily",
         "severity": "MEDIUM",
         "description": "Disable SSH server if not explicitly required for a device.",
         "details": "Disabling unnecessary services reduces the attack surface and minimizes potential entry points for attackers.",
-        "affected_config_template": "System Services: SSH"
+        "affected_config_template": "System Services: SSH is enabled.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.name", "operator": "equals", "value": "ssh" },
+                        { "target": "service.enabled", "operator": "equals", "value": true }
+                    ]
+                },
+                "affected_params": {
+                    "service_name": "service.name"
+                }
+            }
+        }
     },
     {
         "id": "VOS-SYS-002",
+        "name": "DNS Servers Not Configured",
         "severity": "HIGH",
         "description": "Ensure DNS servers are correctly configured for operational and security functions.",
         "details": "Proper DNS configuration is essential for system updates, name resolution, and communication with external services, including security package downloads.",
-        "affected_config_template": "System Services: DNS"
+        "affected_config_template": "System Services: DNS servers not configured.",
+        "check": {
+            "operator": "not_contains_item",
+            "target": "system_services",
+            "value": {
+                "name": "dns",
+                "configured": true
+            }
+        }
     },
     {
         "id": "VOS-SYS-003",
+        "name": "Secure Mode Not Enabled",
         "severity": "MEDIUM",
         "description": "Verify 'Secure Mode' is enabled to harden underlying Linux OS components per CIS benchmarks.",
         "details": "Secure Mode applies hardened configurations to the Linux operating system, aligning with industry security best practices.",
-        "affected_config_template": "System: Secure Mode"
+        "affected_config_template": "System: Secure Mode is not enabled.",
+        "check": {
+            "operator": "not_contains_item",
+            "target": "system_services",
+            "value": {
+                "name": "secure-mode",
+                "enabled": true
+            }
+        }
     },
     {
         "id": "VOS-FW-003",
+        "name": "Default-Deny IP Tables Not Implemented",
         "severity": "CRITICAL",
         "description": "Implement default-deny IP packet filtering rules (iptables) on management interfaces.",
         "details": "A default-deny posture ensures that only explicitly allowed traffic can reach management interfaces, significantly reducing the attack surface.",
-        "affected_config_template": "System: IP Tables"
+        "affected_config_template": "System: IP Tables default-deny not implemented.",
+        "check": {
+            "operator": "not_contains_item",
+            "target": "system_services",
+            "value": {
+                "name": "iptables",
+                "default_deny_enabled": true
+            }
+        }
     },
     {
         "id": "VOS-AUTH-007",
+        "name": "Centralized Authentication Not Mandated",
         "severity": "CRITICAL",
         "description": "Mandate centralized authentication integration (RADIUS, TACACS+, LDAP, Active Directory) and disable local authentication.",
         "details": "Centralized authentication provides a single point of control for user access, simplifies management, and enables consistent policy enforcement.",
-        "affected_config_template": "Administration: Authentication"
+        "affected_config_template": "Administration: Centralized authentication not mandated or local authentication enabled.",
+        "check": {
+            "operator": "and",
+            "conditions": [
+                { "target": "user_auth_profiles.centralized_auth_enabled", "operator": "equals", "value": false },
+                { "target": "user_auth_profiles.local_auth_disabled", "operator": "equals", "value": false }
+            ]
+        }
     },
     {
         "id": "VOS-AUTH-008",
+        "name": "RBAC Not Properly Implemented",
         "severity": "HIGH",
         "description": "Verify proper Role-Based Access Control (RBAC) implementation ensuring least privilege.",
         "details": "RBAC restricts users to only the permissions required for their job functions, limiting the potential impact of a compromised account.",
-        "affected_config_template": "Administration: User Management, Roles"
+        "affected_config_template": "Administration: User Management, Roles: RBAC not properly implemented.",
+        "check": {
+            "target": "user_auth_profiles.rbac_properly_implemented",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-AUTH-009",
+        "name": "MFA Not Enforced for Admin Access",
         "severity": "HIGH",
         "description": "Enforce Multi-Factor Authentication (MFA) for administrative access.",
         "details": "MFA adds a critical layer of security beyond passwords, making it significantly harder for unauthorized users to gain access even if credentials are stolen.",
-        "affected_config_template": "Administration: MFA"
+        "affected_config_template": "Administration: MFA not enforced for administrative access.",
+        "check": {
+            "target": "user_auth_profiles.mfa_enabled_for_admin",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-API-001",
+        "name": "Basic API Authentication Used",
         "severity": "CRITICAL",
         "description": "Prioritize Open Authorization (OAuth) tokens over basic authentication for REST API requests to Versa Director.",
         "details": "OAuth provides a more secure, token-based authentication mechanism compared to basic authentication, which transmits credentials in a less secure manner.",
-        "affected_config_template": "System: API Management"
+        "affected_config_template": "System: API Management uses basic authentication.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.name", "operator": "equals", "value": "api-management" },
+                        { "target": "service.basic_auth_enabled", "operator": "equals", "value": true }
+                    ]
+                },
+                "affected_params": {
+                    "service_name": "service.name"
+                }
+            }
+        }
     },
     {
         "id": "VOS-API-002",
+        "name": "API Rate Limits Not Configured",
         "severity": "HIGH",
         "description": "Configure API rate limits to prevent Denial of Service (DoS) attacks and abuse.",
         "details": "Rate limiting protects API endpoints from excessive requests that could lead to performance degradation or denial of service.",
-        "affected_config_template": "System: API Management"
+        "affected_config_template": "System: API Management rate limits not configured.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.name", "operator": "equals", "value": "api-management" },
+                        { "target": "service.rate_limiting_configured", "operator": "equals", "value": false }
+                    ]
+                },
+                "affected_params": {
+                    "service_name": "service.name"
+                }
+            }
+        }
     },
     {
         "id": "VOS-SEG-001",
+        "name": "VRF Misconfigured",
         "severity": "HIGH",
         "description": "Verify correct Virtual Routing and Forwarding (VRF) assignments for Layer 3 isolation.",
         "details": "VRFs provide network segmentation at Layer 3, preventing unauthorized lateral movement between different network segments.",
-        "affected_config_template": "Network: VRF Instances"
+        "affected_config_template": "Network: VRF Instances misconfigured.",
+        "check": {
+            "target": "network_configs.vrf_misconfigured",
+            "operator": "equals",
+            "value": true
+        }
     },
     {
         "id": "VOS-SEG-002",
+        "name": "ZBFW Not Properly Defined",
         "severity": "CRITICAL",
         "description": "Ensure Zone-Based Firewalls (ZBFW) are properly defined and applied to all security zones.",
         "details": "ZBFW is fundamental for controlling traffic flow between defined security zones and enforcing security policies at zone boundaries.",
-        "affected_config_template": "Security: Zones, Security Policy: Zone-Pair"
+        "affected_config_template": "Security: Zones, Security Policy: Zone-Pair: ZBFW not properly defined.",
+        "check": {
+            "target": "security_policies.zbfw_properly_defined",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-SEG-003",
+        "name": "Micro-segmentation Not Implemented",
         "severity": "HIGH",
         "description": "Implement micro-segmentation policies to enforce granular, least-privilege access for devices.",
         "details": "Micro-segmentation limits communication between individual workloads or devices, significantly reducing the impact of breaches by preventing lateral movement.",
-        "affected_config_template": "Security: Micro-segmentation, Policy"
+        "affected_config_template": "Security: Micro-segmentation, Policy: Micro-segmentation not implemented.",
+        "check": {
+            "target": "security_policies.microsegmentation_implemented",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-FW-004",
+        "name": "NGFW Services Not Enabled or Policies Missing",
         "severity": "CRITICAL",
         "description": "Ensure Next Generation Firewall (NGFW) services are globally enabled and application-aware policies are in place.",
         "details": "NGFW capabilities provide deep packet inspection and application-level control, which is essential for modern threat prevention.",
-        "affected_config_template": "Security: NGFW, Global Settings"
+        "affected_config_template": "Security: NGFW services not enabled or application-aware policies missing.",
+        "check": {
+            "operator": "or",
+            "conditions": [
+                { "target": "security_policies.ngfw_enabled", "operator": "equals", "value": false },
+                { "target": "security_policies.application_aware_policies_in_place", "operator": "equals", "value": false }
+            ]
+        }
     },
     {
         "id": "VOS-IPS-001",
+        "name": "IPS/IDS Not Enabled or Profiles Missing",
         "severity": "CRITICAL",
         "description": "Enable Intrusion Prevention/Detection Systems (IPS/IDS) and configure comprehensive IPS profiles.",
         "details": "IPS/IDS proactively detects and blocks known threats and malicious activities based on signatures and behavioral patterns.",
-        "affected_config_template": "Security: IPS/IDS, Profiles"
+        "affected_config_template": "Security: IPS/IDS not enabled or comprehensive profiles missing.",
+        "check": {
+            "operator": "or",
+            "conditions": [
+                { "target": "security_policies.ips_ids_enabled", "operator": "equals", "value": false },
+                { "target": "security_policies.comprehensive_ips_profiles_configured", "operator": "equals", "value": false }
+            ]
+        }
     },
     {
         "id": "VOS-URL-001",
+        "name": "URL Filtering Not Configured",
         "severity": "HIGH",
         "description": "Configure URL filtering policies with comprehensive deny/allow lists and appropriate actions.",
         "details": "URL filtering controls access to web content, preventing access to malicious sites and enforcing acceptable use policies.",
-        "affected_config_template": "Security: URL Filtering, Policies"
+        "affected_config_template": "Security: URL Filtering policies not configured.",
+        "check": {
+            "target": "security_policies.url_filtering_configured",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-AV-001",
+        "name": "Anti-Virus/Anti-Malware Not Enabled or Updates Missing",
         "severity": "HIGH",
         "description": "Enable native Anti-Virus/Anti-Malware and ensure real-time signature updates are configured.",
         "details": "Real-time AV/Anti-Malware protection with up-to-date signatures is crucial for detecting and mitigating malware threats.",
-        "affected_config_template": "Security: Anti-Virus/Anti-Malware"
+        "affected_config_template": "Security: Anti-Virus/Anti-Malware not enabled or real-time updates missing.",
+        "check": {
+            "operator": "or",
+            "conditions": [
+                { "target": "security_policies.antivirus_enabled", "operator": "equals", "value": false },
+                { "target": "security_policies.realtime_signature_updates_configured", "operator": "equals", "value": false }
+            ]
+        }
     },
     {
         "id": "VOS-DLP-001",
+        "name": "Data Loss Prevention Not Enabled",
         "severity": "HIGH",
         "description": "Enable and configure Data Loss Prevention (DLP) policies to protect sensitive data in transit.",
         "details": "DLP prevents unauthorized exfiltration or leakage of sensitive information, ensuring compliance and data confidentiality.",
-        "affected_config_template": "Security: Data Loss Prevention, Policies"
+        "affected_config_template": "Security: Data Loss Prevention policies not enabled.",
+        "check": {
+            "target": "security_policies.dlp_enabled",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-VPN-001",
+        "name": "Non-Standard IPsec Cryptography Used",
         "severity": "CRITICAL",
         "description": "Verify use of IETF Standard IPsec-based cryptography for SD-WAN VPN overlays.",
         "details": "Ensures secure and interoperable encrypted tunnels for data transmission over public networks.",
-        "affected_config_template": "VPN: IPsec, Global Settings"
+        "affected_config_template": "VPN: IPsec uses non-standard cryptography.",
+        "check": {
+            "target": "sdwan_policies.ipsec_standard_used",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-VPN-002",
+        "name": "Weak IPsec Cryptographic Algorithms",
         "severity": "CRITICAL",
         "description": "Mandate strong encryption algorithms (e.g., AES-256 with GCM) and robust hashing algorithms (e.g., SHA2-512) for IPsec.",
         "details": "Use of strong, modern cryptographic algorithms is essential to protect the confidentiality and integrity of data within VPN tunnels.",
-        "affected_config_template": "VPN: IPsec, Crypto Profiles"
+        "affected_config_template": "VPN: IPsec uses weak cryptographic algorithms.",
+        "check": {
+            "target": "vpn_configs.weak_ipsec_crypto_used",
+            "operator": "equals",
+            "value": true
+        }
     },
     {
         "id": "VOS-VPN-003",
+        "name": "IPsec Key Management Not Enabled",
         "severity": "HIGH",
         "description": "Enable automatic key management and certificate lifecycle management for IPsec tunnels, including key rotation.",
         "details": "Automated key rotation limits the exposure window if a key is compromised, enhancing long-term security of VPN connections.",
-        "affected_config_template": "VPN: IPsec, Key Management"
+        "affected_config_template": "VPN: IPsec Key Management not enabled.",
+        "check": {
+            "target": "vpn_configs.ipsec_key_management_enabled",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-COMP-001",
+        "name": "PCI-DSS Controls Not Implemented",
         "severity": "HIGH",
         "description": "Verify PCI-DSS specific controls are implemented (firewall for cardholder data, encryption for data in transit).",
         "details": "Adherence to PCI-DSS requirements is critical for organizations handling cardholder data to prevent breaches and ensure compliance.",
-        "affected_config_template": "Security Policy, VPN"
+        "affected_config_template": "Compliance: PCI-DSS controls not implemented.",
+        "check": {
+            "target": "compliance_controls.pci_dss_controls_implemented",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-COMP-002",
+        "name": "FIPS 140-2 Mode Not Enabled",
         "severity": "HIGH",
         "description": "Leverage FIPS 140-2 validated cryptographic modules for control and data plane cryptography.",
         "details": "FIPS 140-2 compliance is required for government and highly regulated environments to ensure cryptographic components meet stringent security standards.",
-        "affected_config_template": "System: FIPS Mode, Crypto Profiles"
+        "affected_config_template": "System: FIPS Mode not enabled.",
+        "check": {
+            "target": "system_services.fips_mode_enabled",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-SYS-004",
+        "name": "Automatic Software Updates Not Enabled",
         "severity": "HIGH",
         "description": "Enable regular and automatic updates for OS security packages (OS SPacks) and Versa-specific Security Packages (SPacks).",
         "details": "Ensures the system receives the latest threat signatures and security patches to defend against emerging vulnerabilities and attacks.",
-        "affected_config_template": "System: Software Updates, SPacks"
+        "affected_config_template": "System: Software Updates, SPacks: Automatic updates not enabled.",
+        "check": {
+            "target": "system_services.auto_updates_enabled",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-SYS-005",
+        "name": "UEFI Secure Boot Not Enabled",
         "severity": "HIGH",
         "description": "Leverage UEFI Secure Boot to verify the integrity of software components from boot loader to kernel.",
         "details": "Secure Boot prevents malicious software from being loaded during the boot process, protecting against rootkits and ensuring system integrity.",
-        "affected_config_template": "System: Boot Security"
+        "affected_config_template": "System: Boot Security: UEFI Secure Boot not enabled.",
+        "check": {
+            "target": "system_services.secure_boot_enabled",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-LOG-001",
+        "name": "Comprehensive Logging Not Enabled",
         "severity": "HIGH",
         "description": "Enable comprehensive logging for VOS features and services (access, IP-filtering, packet capture, SSL decryption).",
         "details": "Detailed logs are essential for security monitoring, incident detection, troubleshooting, and forensic analysis.",
-        "affected_config_template": "System: Logging, Features"
+        "affected_config_template": "System: Logging, Features: Comprehensive logging not enabled.",
+        "check": {
+            "target": "system_services.comprehensive_logging_enabled",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-LOG-002",
+        "name": "Syslog Integration Not Configured",
         "severity": "CRITICAL",
         "description": "Integrate with external syslog servers for centralized log consolidation and SIEM integration.",
         "details": "Centralized logging facilitates efficient security monitoring, real-time alerting, and compliance reporting by aggregating logs from all devices.",
-        "affected_config_template": "System: Logging, Syslog"
+        "affected_config_template": "System: Logging, Syslog: External syslog integration not configured.",
+        "check": {
+            "target": "system_services.syslog_integration_enabled",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-LOG-003",
+        "name": "Advanced Logging Service (ALS) Not Enabled",
         "severity": "HIGH",
         "description": "Enable Versa Advanced Logging Service (ALS) for secure, streamed log integration with SIEM.",
         "details": "ALS provides a robust mechanism for streaming high-volume, real-time event data to SIEM systems, which is crucial for comprehensive threat detection.",
-        "affected_config_template": "Analytics: Logging, ALS"
+        "affected_config_template": "Analytics: Logging, ALS: Advanced Logging Service (ALS) not enabled.",
+        "check": {
+            "target": "system_services.als_enabled",
+            "operator": "equals",
+            "value": false
+        }
     },
     {
         "id": "VOS-LOG-004",
+        "name": "Audit Logs Not Enabled or Reviewed",
         "severity": "MEDIUM",
         "description": "Ensure audit logs for all configuration changes and authentication attempts are enabled and reviewed.",
         "details": "Audit logs provide an immutable record of administrative actions and login attempts, critical for accountability and detecting unauthorized activity.",
-        "affected_config_template": "System: Logging, Audit"
+        "affected_config_template": "System: Logging, Audit: Audit logs not enabled or reviewed.",
+        "check": {
+            "target": "system_services.audit_logs_enabled",
+            "operator": "equals",
+            "value": false
+        }
     }
 ]

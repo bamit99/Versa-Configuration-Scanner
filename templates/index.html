@@ -45,7 +45,13 @@
         </form>
         <div id="loading-indicator">
             <div class="spinner"></div>
-            <p>Scanning in progress, please wait...</p>
+            <p id="loading-message">Scanning in progress, please wait...</p>
+        </div>
+        <div id="scan-status" style="display: none; margin-top: 20px; text-align: center;">
+            <p><strong>Current Scan Status:</strong> <span id="status-text"></span></p>
+            <p id="filename-text"></p>
+            <p id="error-text" style="color: red;"></p>
+            <a id="report-link" href="#" style="display: none;">View Report</a>
         </div>
         <div class="instructions">
             <p><strong>Supported Formats:</strong></p>
@@ -58,14 +64,147 @@
     </div>
 
     <script>
-        document.getElementById('uploadForm').addEventListener('submit', function() {
-            // Show the loading indicator
-            document.getElementById('loading-indicator').style.display = 'block';
-            
-            // Disable the submit button to prevent multiple submissions
-            var submitBtn = document.getElementById('submitBtn');
+        const uploadForm = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('file');
+        const submitBtn = document.getElementById('submitBtn');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const loadingMessage = document.getElementById('loading-message');
+        const scanStatusDiv = document.getElementById('scan-status');
+        const statusText = document.getElementById('status-text');
+        const filenameText = document.getElementById('filename-text');
+        const errorText = document.getElementById('error-text');
+        const reportLink = document.getElementById('report-link');
+
+        let pollingInterval;
+        const POLLING_INTERVAL_MS = 3000; // Poll every 3 seconds
+
+        function showLoading(message = "Scanning in progress, please wait...") {
+            loadingMessage.textContent = message;
+            loadingIndicator.style.display = 'block';
+            scanStatusDiv.style.display = 'none';
             submitBtn.disabled = true;
-            submitBtn.value = 'Scanning...';
+            submitBtn.value = 'Processing...';
+        }
+
+        function hideLoading() {
+            loadingIndicator.style.display = 'none';
+            submitBtn.disabled = false;
+            submitBtn.value = 'Upload and Audit';
+        }
+
+        function updateStatusUI(task) {
+            scanStatusDiv.style.display = 'block';
+            statusText.textContent = task.status.toUpperCase();
+            filenameText.textContent = `File: ${task.filename}`;
+            errorText.style.display = 'none';
+            reportLink.style.display = 'none';
+
+            if (task.status === 'completed') {
+                reportLink.href = `/reports/${task.report_name}`; // Construct URL on client side
+                reportLink.style.display = 'inline';
+                loadingMessage.textContent = "Scan completed!";
+                hideLoading();
+                clearInterval(pollingInterval);
+                localStorage.removeItem('currentScanTaskId'); // Clear task ID on completion
+            } else if (task.status === 'failed') {
+                errorText.textContent = `Error: ${task.error}`;
+                errorText.style.display = 'block';
+                loadingMessage.textContent = "Scan failed!";
+                hideLoading();
+                clearInterval(pollingInterval);
+                localStorage.removeItem('currentScanTaskId'); // Clear task ID on failure
+            } else {
+                showLoading(`Scan status: ${task.status}...`);
+            }
+        }
+
+        async function pollScanStatus(taskId) {
+            try {
+                const response = await fetch(`/status/${taskId}`);
+                const data = await response.json();
+                if (response.ok) {
+                    updateStatusUI(data);
+                } else {
+                    console.error('Error fetching status:', data.error);
+                    errorText.textContent = `Error: ${data.error}`;
+                    errorText.style.display = 'block';
+                    hideLoading();
+                    clearInterval(pollingInterval);
+                    localStorage.removeItem('currentScanTaskId');
+                }
+            } catch (error) {
+                console.error('Network error during polling:', error);
+                errorText.textContent = `Network error: Could not connect to server.`;
+                errorText.style.display = 'block';
+                hideLoading();
+                clearInterval(pollingInterval);
+                localStorage.removeItem('currentScanTaskId');
+            }
+        }
+
+        async function startPolling(taskId) {
+            // Clear any existing interval to prevent multiple polls
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            // Immediately poll once, then set interval
+            await pollScanStatus(taskId);
+            pollingInterval = setInterval(() => pollScanStatus(taskId), POLLING_INTERVAL_MS);
+        }
+
+        uploadForm.addEventListener('submit', async function(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            showLoading("Uploading file...");
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const uploadResponse = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const uploadData = await uploadResponse.json();
+
+                if (uploadResponse.ok) {
+                    const taskId = uploadData.task_id;
+                    localStorage.setItem('currentScanTaskId', taskId); // Save task ID
+                    showLoading("File uploaded. Initiating scan...");
+
+                    // Initiate the scan on the backend
+                    const scanResponse = await fetch(`/scan/${taskId}`, {
+                        method: 'POST'
+                    });
+                    const scanData = await scanResponse.json();
+
+                    if (scanResponse.ok) {
+                        showLoading("Scan initiated. Waiting for results...");
+                        startPolling(taskId); // Start polling for status
+                    } else {
+                        throw new Error(scanData.error || 'Failed to initiate scan.');
+                    }
+                } else {
+                    throw new Error(uploadData.error || 'File upload failed.');
+                }
+            } catch (error) {
+                console.error('Upload or Scan initiation error:', error);
+                errorText.textContent = `Operation failed: ${error.message}`;
+                errorText.style.display = 'block';
+                hideLoading();
+                clearInterval(pollingInterval);
+                localStorage.removeItem('currentScanTaskId');
+            }
+        });
+
+        // On page load, check for an existing task ID in localStorage
+        window.addEventListener('load', () => {
+            const storedTaskId = localStorage.getItem('currentScanTaskId');
+            if (storedTaskId) {
+                console.log(`Recovering previous scan with Task ID: ${storedTaskId}`);
+                showLoading("Recovering previous scan status...");
+                startPolling(storedTaskId);
+            }
         });
     </script>
 </body>
