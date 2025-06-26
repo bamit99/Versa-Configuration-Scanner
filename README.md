@@ -17,6 +17,9 @@ This is a web-based tool designed to audit network device configuration files fo
 
 ## Project Structure
 
+![image](https://github.com/user-attachments/assets/6f7bc5ed-d003-4bbc-8d8a-48a7bbd10b0a)
+
+
 ```
 .
 ├── app.py              # Main Flask application file (routes, views, task management)
