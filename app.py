@@ -197,14 +197,11 @@ def run_scan_task(task_id):
 
             csv_report_name = write_findings_to_csv(findings, filename, report_filepath)
             
+            # Generate HTML report without using render_template (to avoid Flask context issues)
+            html_content = generate_html_report(filename, findings, get_severity_counts(findings), len(findings), len(rules), csv_report_name)
+            
             with open(report_filepath, 'w', encoding='utf-8') as rf:
-                rf.write(render_template('report.html',
-                                          filename=filename,
-                                          findings=findings,
-                                          severity_counts=get_severity_counts(findings),
-                                          total_findings=len(findings),
-                                          total_rules=len(rules),
-                                          csv_report_name=csv_report_name))
+                rf.write(html_content)
 
             with task_lock:
                 task['status'] = 'completed'
@@ -264,6 +261,134 @@ def get_severity_counts(findings):
         if severity in counts:
             counts[severity] += 1
     return counts
+
+def generate_html_report(filename, findings, severity_counts, total_findings, total_rules, csv_report_name):
+    """Generate HTML report without using Flask's render_template to avoid context issues."""
+    severity_colors = {
+        'CRITICAL': '#dc3545',
+        'HIGH': '#fd7e14', 
+        'MEDIUM': '#ffc107',
+        'WARNING': '#17a2b8',
+        'LOW': '#28a745'
+    }
+    
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Report - {filename}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; margin: 0; background-color: #f4f4f4; color: #333; }}
+        .container {{ max-width: 1000px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
+        h1 {{ color: #0056b3; text-align: center; }}
+        .summary {{ background: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
+        .summary-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }}
+        .summary-item {{ text-align: center; }}
+        .summary-item h3 {{ margin: 0; font-size: 1.5em; }}
+        .summary-item p {{ margin: 5px 0 0 0; font-size: 0.9em; color: #666; }}
+        .findings {{ margin-top: 20px; }}
+        .finding {{ border: 1px solid #ddd; border-radius: 5px; margin-bottom: 15px; padding: 15px; }}
+        .finding-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }}
+        .finding-title {{ font-weight: bold; font-size: 1.1em; }}
+        .severity {{ padding: 4px 8px; border-radius: 3px; color: white; font-size: 0.8em; font-weight: bold; }}
+        .finding-details {{ margin-top: 10px; }}
+        .affected-config {{ background: #f8f9fa; padding: 10px; border-left: 4px solid #007bff; margin-top: 10px; font-family: monospace; }}
+        .nav-links {{ text-align: center; margin-bottom: 20px; }}
+        .nav-links a {{ color: #007bff; text-decoration: none; margin: 0 10px; }}
+        .nav-links a:hover {{ text-decoration: underline; }}
+        .download-link {{ text-align: center; margin-top: 20px; }}
+        .download-link a {{ background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; }}
+        .download-link a:hover {{ background: #218838; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-links">
+            <a href="/">← Back to Scanner</a>
+            <a href="/history">View History</a>
+        </div>
+        
+        <h1>Configuration Audit Report</h1>
+        <p><strong>File:</strong> {filename}</p>
+        <p><strong>Scan Date:</strong> {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}</p>
+        
+        <div class="summary">
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <h3>{total_findings}</h3>
+                    <p>Total Findings</p>
+                </div>
+                <div class="summary-item">
+                    <h3>{total_rules}</h3>
+                    <p>Rules Evaluated</p>
+                </div>"""
+    
+    for severity, count in severity_counts.items():
+        if count > 0:
+            color = severity_colors.get(severity, '#6c757d')
+            html += f"""
+                <div class="summary-item">
+                    <h3 style="color: {color};">{count}</h3>
+                    <p>{severity}</p>
+                </div>"""
+    
+    html += """
+            </div>
+        </div>"""
+    
+    if csv_report_name:
+        html += f"""
+        <div class="download-link">
+            <a href="/reports/{csv_report_name}">Download CSV Report</a>
+        </div>"""
+    
+    html += """
+        <div class="findings">"""
+    
+    if findings:
+        for finding in findings:
+            severity = finding.get('severity', 'LOW').upper()
+            color = severity_colors.get(severity, '#6c757d')
+            html += f"""
+            <div class="finding">
+                <div class="finding-header">
+                    <div class="finding-title">{finding.get('description', 'No description')}</div>
+                    <span class="severity" style="background-color: {color};">{severity}</span>
+                </div>
+                <div class="finding-details">
+                    <p><strong>Rule ID:</strong> {finding.get('rule_id', 'N/A')}</p>
+                    <p><strong>Details:</strong> {finding.get('details', 'No details available')}</p>"""
+            
+            if finding.get('affected_config'):
+                html += f"""
+                    <div class="affected-config">
+                        <strong>Affected Configuration:</strong><br>
+                        {finding.get('affected_config')}
+                    </div>"""
+            
+            html += """
+                </div>
+            </div>"""
+    else:
+        html += """
+            <div class="finding">
+                <div class="finding-header">
+                    <div class="finding-title">No Issues Found</div>
+                    <span class="severity" style="background-color: #28a745;">CLEAN</span>
+                </div>
+                <div class="finding-details">
+                    <p>Congratulations! No security issues or best-practice violations were detected in this configuration.</p>
+                </div>
+            </div>"""
+    
+    html += """
+        </div>
+    </div>
+</body>
+</html>"""
+    
+    return html
 
 def write_findings_to_csv(findings, original_filename, report_filepath):
     """Appends audit findings to a CSV file."""

@@ -4,14 +4,16 @@ This is a web-based tool designed to audit network device configuration files fo
 
 ## Features
 
--   **Multi-Platform Support with Auto-Detection:** Automatically identifies the vendor/platform (e.g., Versa) of the uploaded configuration file based on its content. Future extensions will support more platforms.
+-   **Multi-Platform Support with Auto-Detection:** Automatically identifies the vendor/platform (Versa, Cisco IOS, Juniper Junos) of the uploaded configuration file based on its content. Manual platform selection available when auto-detection fails.
 -   **Multi-Format Support:** Parses configurations from CLI (`set` commands), JSON, and XML files.
--   **Asynchronous Scanning & Session Recovery:** Long-running scans are processed in the background, allowing the user to navigate away or refresh the page. The tool can recover the status of ongoing or completed scans upon returning.
+-   **Asynchronous Scanning & Session Recovery:** Long-running scans are processed in the background with real-time progress updates. The tool can recover the status of ongoing or completed scans upon returning.
 -   **Extensible Rule Engine:** Audit rules are defined in external JSON files, organized by platform, making it easy to add or modify checks without changing the core application logic.
 -   **Web-Based UI with Navigation:** A clean and intuitive user interface with a global navigation bar to easily switch between the main scanner page and the scan history.
 -   **Scan History Dashboard:** A dedicated page to view a list of all past scans, their status, and links to their respective reports.
--   **HTML & CSV Reporting:** Generates a user-friendly HTML report and a CSV file for easy data export and analysis.
+-   **HTML & CSV Reporting:** Generates a user-friendly HTML report with severity-based color coding and a CSV file for easy data export and analysis.
 -   **Persistent Scan Records:** Scan metadata (status, filename, platform, report link) is stored in a SQLite database, ensuring history is retained across application restarts.
+-   **Real-time Progress Tracking:** Live status updates during scanning with loading indicators and error handling.
+-   **Debug Mode:** Optional debugging mode to troubleshoot upload and scanning issues.
 
 ## Project Structure
 
@@ -132,3 +134,65 @@ To add a new network platform (e.g., Cisco IOS, Juniper Junos):
     *   (Optional) Enhance the `PlatformDetector` in `engine.py` with heuristics to auto-detect your new platform based on its unique configuration syntax.
 
 This modular approach allows for continuous expansion of the auditor's capabilities.
+
+## Recent Fixes and Improvements
+
+### Version 2.0 Updates (June 2025)
+
+**Fixed Critical Issues:**
+- ✅ **Upload Button Not Working**: Fixed missing JavaScript DOM element references and template block issues
+- ✅ **Flask Context Errors**: Resolved background thread template rendering issues by implementing direct HTML generation
+- ✅ **Missing Progress Updates**: Added real-time scanning progress with loading indicators
+- ✅ **Template Integration**: Fixed base template to properly include JavaScript from child templates
+
+**New Features:**
+- 🆕 **Debug Mode**: Added optional debugging checkbox to troubleshoot upload/scan issues
+- 🆕 **Enhanced Error Handling**: Improved error messages and UI state management
+- 🆕 **Better Platform Detection**: Enhanced auto-detection algorithms with scoring system
+- 🆕 **Responsive UI**: Improved loading states and button feedback
+
+## Testing
+
+A sample test configuration file (`test_config_sample.txt`) is included to verify the application functionality. This file contains various security misconfigurations that should trigger multiple audit findings:
+
+- Telnet service enabled (CRITICAL)
+- Insecure SNMP community "public" (HIGH)
+- Overly permissive security policies (MEDIUM)
+
+To test:
+1. Start the application: `python app.py`
+2. Upload `test_config_sample.txt`
+3. Verify the scan completes and generates a report with expected findings
+
+## Troubleshooting
+
+### Common Issues
+
+**Upload button does nothing:**
+- Ensure you're using the latest version with the fixed JavaScript
+- Check browser console (F12) for JavaScript errors
+- Enable debug mode checkbox for detailed response information
+
+**Scan fails with Flask context errors:**
+- This has been fixed in the latest version
+- Ensure you're using the updated `app.py` with `generate_html_report()` function
+
+**Platform not detected:**
+- Use manual platform selection from the dropdown
+- Check that your configuration file matches one of the supported formats
+- Verify file extension is .txt, .json, .xml, or .cli
+
+**Reports not generating:**
+- Check that the `reports/` directory exists and is writable
+- Verify sufficient disk space
+- Check application logs for specific error messages
+
+### Debug Mode
+
+Enable the debug checkbox on the main page to see detailed information about:
+- Upload responses from the server
+- Scan initiation responses
+- Status polling responses
+- Error details and network issues
+
+This helps identify where issues occur in the upload → scan → report pipeline.

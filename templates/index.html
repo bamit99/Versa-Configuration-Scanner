@@ -7,9 +7,15 @@
         h1 { color: #0056b3; text-align: center; }
         .upload-form { display: flex; flex-direction: column; align-items: center; border: 2px dashed #007bff; padding: 20px; border-radius: 5px; background-color: #f9f9f9; }
         input[type="file"] { border: 1px solid #ccc; padding: 10px; border-radius: 4px; margin-bottom: 10px; }
-        input[type="submit"] { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        input[type="submit"]:hover { background-color: #0056b3; }
+        input[type="submit"], button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        input[type="submit"]:hover, button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
         .instructions { margin-top: 20px; font-size: 0.9em; color: #666; }
+        
+        /* Loading spinner styles */
+        #loading-indicator { display: none; text-align: center; margin-top: 20px; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 {% endblock %}
 
@@ -17,16 +23,21 @@
     <h1>Configuration Auditor</h1>
 
     <p>Upload your configuration file to analyze it for security vulnerabilities and best-practice deviations.</p>
-    <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form" id="uploadForm">
-        <label for="file">Choose a configuration file (.txt, .json, .xml, .cli):</label>
-        <input type="file" name="file" id="file" required>
-        <input type="submit" value="Upload and Audit" id="submitBtn">
-    </form>
+        <form class="upload-form" id="uploadForm">
+            <label for="file">Choose a configuration file (.txt, .json, .xml, .cli):</label>
+            <input type="file" name="file" id="file" required>
+            <button type="button" id="submitBtn">Upload and Audit</button>
+        </form>
+
+        <div style="margin-top: 10px; text-align: center;">
+            <input type="checkbox" id="debugModeCheckbox">
+            <label for="debugModeCheckbox">Enable Debugging (shows raw responses)</label>
+        </div>
 
     <div id="loading-indicator">
         <div class="spinner"></div>
         <p id="loading-message">Scanning in progress, please wait...</p>
-    </div>
+        </div>
 
     <div id="platform-selection" style="display: none; margin-top: 20px; text-align: center;">
         <p>Could not auto-detect platform for <strong id="manual-filename"></strong>. Please select manually:</p>
@@ -59,31 +70,33 @@
 
 {% block body_extra %}
     <script>
-        const uploadForm = document.getElementById('uploadForm');
-        const fileInput = document.getElementById('file');
-        const submitBtn = document.getElementById('submitBtn');
-        const loadingIndicator = document.getElementById('loading-indicator');
-        const loadingMessage = document.getElementById('loading-message');
-        const platformSelectionDiv = document.getElementById('platform-selection');
-        const manualFilenameSpan = document.getElementById('manual-filename');
-        const platformSelect = document.getElementById('platform-select');
-        const manualScanBtn = document.getElementById('manual-scan-btn');
-        const scanStatusDiv = document.getElementById('scan-status');
-        const statusText = document.getElementById('status-text');
-        const filenameText = document.getElementById('filename-text');
-        const platformText = document.getElementById('platform-text');
-        const errorText = document.getElementById('error-text');
-        const reportLink = document.getElementById('report-link');
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get all DOM element references
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const loadingMessage = document.getElementById('loading-message');
+            const platformSelectionDiv = document.getElementById('platform-selection');
+            const scanStatusDiv = document.getElementById('scan-status');
+            const submitBtn = document.getElementById('submitBtn');
+            const fileInput = document.getElementById('file');
+            const manualFilenameSpan = document.getElementById('manual-filename');
+            const statusText = document.getElementById('status-text');
+            const filenameText = document.getElementById('filename-text');
+            const platformText = document.getElementById('platform-text');
+            const errorText = document.getElementById('error-text');
+            const reportLink = document.getElementById('report-link');
+            const manualScanBtn = document.getElementById('manual-scan-btn');
+            const platformSelect = document.getElementById('platform-select');
+            const debugModeCheckbox = document.getElementById('debugModeCheckbox');
 
-        let pollingInterval;
-        const POLLING_INTERVAL_MS = 3000; // Poll every 3 seconds
+            let pollingInterval;
+            const POLLING_INTERVAL_MS = 3000; // Poll every 3 seconds
 
-        let currentTask = {
-            id: null,
-            filepath: null,
-            filename: null,
-            platform: null
-        };
+            let currentTask = {
+                id: null,
+                filepath: null,
+                filename: null,
+                platform: null
+            };
 
         function showLoading(message = "Scanning in progress, please wait...") {
             loadingMessage.textContent = message;
@@ -91,13 +104,13 @@
             platformSelectionDiv.style.display = 'none';
             scanStatusDiv.style.display = 'none';
             submitBtn.disabled = true;
-            submitBtn.value = 'Processing...';
+            submitBtn.textContent = 'Processing...'; // Corrected to textContent
         }
 
         function hideLoading() {
             loadingIndicator.style.display = 'none';
             submitBtn.disabled = false;
-            submitBtn.value = 'Upload and Audit';
+            submitBtn.textContent = 'Upload and Audit'; // Corrected to textContent
         }
 
         function showPlatformSelection(filename, filepath) {
@@ -146,6 +159,9 @@
             try {
                 const response = await fetch(`/status/${taskId}`);
                 const data = await response.json();
+                if (debugModeCheckbox.checked) {
+                    alert(`Polling Response for ${taskId}:\nStatus: ${response.status}\nData: ${JSON.stringify(data, null, 2)}`);
+                }
                 if (response.ok) {
                     updateStatusUI(data);
                 } else {
@@ -191,6 +207,9 @@
                     body: JSON.stringify({ task_id: taskId, platform: platform, filepath: filepath, filename: filename })
                 });
                 const scanData = await scanResponse.json();
+                if (debugModeCheckbox.checked) {
+                    alert(`Initiate Scan Response:\nStatus: ${scanResponse.status}\nData: ${JSON.stringify(scanData, null, 2)}`);
+                }
 
                 if (scanResponse.ok) {
                     localStorage.setItem('currentScanTaskId', taskId);
@@ -215,128 +234,104 @@
             }
         }
 
-        uploadForm.addEventListener('submit', async function(event) {
-            event.preventDefault(); // Prevent default form submission
-            console.log("Form submitted. Default prevented.");
+            // Event listener for upload button
+            submitBtn.addEventListener('click', async function() {
+                console.log("Submit button clicked. Starting upload process.");
 
-            if (!fileInput.files || fileInput.files.length === 0) {
-                alert('Please select a file to upload.');
-                hideLoading();
-                return;
-            }
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    alert('Please select a file to upload.');
+                    return;
+                }
 
-            // Set filename and filepath in currentTask immediately from fileInput
-            currentTask.filename = fileInput.files[0].name;
-            // Note: filepath is not directly available from fileInput for security reasons.
-            // It will be returned by the backend /upload endpoint.
-            // For now, we'll rely on the backend to provide it or handle its absence.
-            // If the backend doesn't return it, currentTask.filepath will remain null,
-            // but the initiate_scan endpoint expects it.
-            // The backend's /upload endpoint *must* return 'filepath' for successful auto-detection.
+                currentTask.filename = fileInput.files[0].name;
+                showLoading("Uploading file and detecting platform...");
 
-            showLoading("Uploading file and detecting platform...");
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
 
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-
-            try {
-                const uploadResponse = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                console.log("Upload response received. Status:", uploadResponse.status, "OK:", uploadResponse.ok);
-
-                let uploadData; // Declare once
                 try {
-                    uploadData = await uploadResponse.json(); // Attempt to parse JSON
-                    console.log("Upload data parsed:", uploadData);
-                } catch (jsonError) {
-                    console.error("Error parsing JSON response:", jsonError);
-                    errorText.textContent = `Server response was not valid JSON. Status: ${uploadResponse.status}`;
+                    const uploadResponse = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    console.log("Upload response received. Status:", uploadResponse.status, "OK:", uploadResponse.ok);
+
+                    let uploadData;
+                    try {
+                        uploadData = await uploadResponse.json();
+                        if (debugModeCheckbox.checked) {
+                            alert(`Upload Response:\nStatus: ${uploadResponse.status}\nData: ${JSON.stringify(uploadData, null, 2)}`);
+                        }
+                        console.log("Upload data parsed:", uploadData);
+                    } catch (jsonError) {
+                        console.error("Error parsing JSON response:", jsonError);
+                        errorText.textContent = `Server response was not valid JSON. Status: ${uploadResponse.status}`;
+                        errorText.style.display = 'block';
+                        hideLoading();
+                        return;
+                    }
+
+                    if (uploadResponse.ok) {
+                        // Auto-detection successful
+                        console.log("Platform auto-detected. Initiating scan.");
+                        currentTask.id = uploadData.task_id;
+                        currentTask.platform = uploadData.platform;
+                        currentTask.filepath = uploadData.filepath;
+                        currentTask.filename = uploadData.filename;
+                        await initiateScan(currentTask.id, currentTask.platform, currentTask.filepath, currentTask.filename);
+                    } else if (uploadResponse.status === 422 && uploadData.status === 'platform_unknown') {
+                        // Platform unknown - show manual selection
+                        console.log("Platform unknown (422). Showing manual selection UI.");
+                        showPlatformSelection(
+                            uploadData.filename || fileInput.files[0].name,
+                            uploadData.filepath || ''
+                        );
+                    } else {
+                        // Other errors
+                        console.error("Upload response not OK:", uploadData.error);
+                        errorText.textContent = `Upload failed: ${uploadData.error || 'Unknown server error'}`;
+                        errorText.style.display = 'block';
+                        hideLoading();
+                    }
+                } catch (error) {
+                    console.error('Network error during upload:', error);
+                    errorText.textContent = `Network error: ${error.message}. Check browser console for details.`;
                     errorText.style.display = 'block';
                     hideLoading();
-                    clearInterval(pollingInterval);
-                    localStorage.removeItem('currentScanTaskId');
-                    localStorage.removeItem('currentScanFilepath');
-                    localStorage.removeItem('currentScanFilename');
-                    localStorage.removeItem('currentScanPlatform');
-                    return; // Stop here if JSON parsing fails
                 }
+            });
 
-                if (uploadResponse.ok) {
-                    // This path is for 202 Accepted (auto-detection successful)
-                    console.log("Platform auto-detected. Initiating scan.");
-                    currentTask.id = uploadData.task_id;
-                    currentTask.platform = uploadData.platform;
-                    currentTask.filepath = uploadData.filepath; // Ensure filepath is taken from backend response
-                    currentTask.filename = uploadData.filename; // Ensure filename is taken from backend response
-                    await initiateScan(currentTask.id, currentTask.platform, currentTask.filepath, currentTask.filename);
-                    return; // Explicitly stop execution after successful initiation
-                } else if (uploadResponse.status === 422 && uploadData.status === 'platform_unknown') {
-                    // Specific handling for 422 Unprocessable Entity when platform is unknown
-                    console.log("Platform unknown (422). Showing manual selection UI.");
-                    showPlatformSelection(
-                        uploadData.filename || fileInput.files[0].name,
-                        uploadData.filepath || ''
-                    );
-                    return; // Explicitly stop execution after showing manual selection
-                } else {
-                    // Generic error handling for other non-OK responses
-                    console.error("Upload response not OK:", uploadData.error);
-                    errorText.textContent = `Upload failed: ${uploadData.error || 'Unknown server error'}`;
-                    errorText.style.display = 'block';
-                    hideLoading();
-                    clearInterval(pollingInterval);
-                    localStorage.removeItem('currentScanTaskId');
-                    localStorage.removeItem('currentScanFilepath');
-                    localStorage.removeItem('currentScanFilename');
-                    localStorage.removeItem('currentScanPlatform');
-                    return; // Explicitly stop execution after showing error
+            // Event listener for manual scan button
+            manualScanBtn.addEventListener('click', async function() {
+                const selectedPlatform = platformSelect.value;
+                if (!selectedPlatform) {
+                    alert('Please select a platform.');
+                    return;
                 }
-            } catch (error) {
-                // Network errors (e.g., server unreachable)
-                console.error('Caught client-side error during fetch operation:', error);
-                errorText.textContent = `Network error: ${error.message}. Check browser console for details.`;
-                errorText.style.display = 'block';
-                hideLoading();
-                clearInterval(pollingInterval);
-                localStorage.removeItem('currentScanTaskId');
-                localStorage.removeItem('currentScanFilepath');
-                localStorage.removeItem('currentScanFilename');
-                localStorage.removeItem('currentScanPlatform');
-                return; // Explicitly stop execution after network error
-            }
-        });
+                currentTask.platform = selectedPlatform;
+                if (!currentTask.id) {
+                    currentTask.id = 'manual-' + Date.now();
+                }
+                await initiateScan(currentTask.id, currentTask.platform, currentTask.filepath, currentTask.filename);
+            });
 
-        manualScanBtn.addEventListener('click', async function() {
-            const selectedPlatform = platformSelect.value;
-            if (!selectedPlatform) {
-                alert('Please select a platform.');
-                return;
-            }
-            currentTask.platform = selectedPlatform;
-            // If currentTask.id is null, generate a new one for manual initiation
-            if (!currentTask.id) {
-                currentTask.id = 'manual-' + Date.now(); // Simple unique ID for manual tasks
-            }
-            await initiateScan(currentTask.id, currentTask.platform, currentTask.filepath, currentTask.filename);
-        });
+            // Recovery on page load
+            window.addEventListener('load', () => {
+                const storedTaskId = localStorage.getItem('currentScanTaskId');
+                const storedFilepath = localStorage.getItem('currentScanFilepath');
+                const storedFilename = localStorage.getItem('currentScanFilename');
+                const storedPlatform = localStorage.getItem('currentScanPlatform');
 
-        window.addEventListener('load', () => {
-            const storedTaskId = localStorage.getItem('currentScanTaskId');
-            const storedFilepath = localStorage.getItem('currentScanFilepath');
-            const storedFilename = localStorage.getItem('currentScanFilename');
-            const storedPlatform = localStorage.getItem('currentScanPlatform');
-
-            if (storedTaskId && storedFilepath && storedFilename && storedPlatform) {
-                console.log(`Recovering previous scan with Task ID: ${storedTaskId}, Platform: ${storedPlatform}`);
-                currentTask.id = storedTaskId;
-                currentTask.filepath = storedFilepath;
-                currentTask.filename = storedFilename;
-                currentTask.platform = storedPlatform;
-                showLoading("Recovering previous scan status...");
-                startPolling(storedTaskId);
-            }
+                if (storedTaskId && storedFilepath && storedFilename && storedPlatform) {
+                    console.log(`Recovering previous scan with Task ID: ${storedTaskId}, Platform: ${storedPlatform}`);
+                    currentTask.id = storedTaskId;
+                    currentTask.filepath = storedFilepath;
+                    currentTask.filename = storedFilename;
+                    currentTask.platform = storedPlatform;
+                    showLoading("Recovering previous scan status...");
+                    startPolling(storedTaskId);
+                }
+            });
         });
     </script>
 {% endblock %}

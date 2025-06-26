@@ -1,0 +1,10 @@
+set system services telnet
+set system services web-management http
+set system services web-management https port 8443
+set system services snmp community public authorization read-only
+set system services ssh port 22
+set system login password complexity enable
+set security policy from-zone trust to-zone untrust policy allow-all match source-address any
+set security policy from-zone trust to-zone untrust policy allow-all match destination-address any
+set security policy from-zone trust to-zone untrust policy allow-all match application any
+set security policy from-zone trust to-zone untrust policy allow-all then permit
