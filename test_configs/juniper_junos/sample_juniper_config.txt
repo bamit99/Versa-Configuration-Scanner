@@ -1,0 +1,38 @@
+system {
+    host-name JuniperRouter;
+    root-authentication {
+        encrypted-password "$9$abcdefg";
+    }
+    services {
+        ssh {
+            root-login allow;
+            protocol-version v2;
+        }
+        telnet;
+    }
+}
+interfaces {
+    ge-0/0/0 {
+        unit 0 {
+            family inet {
+                address 10.0.0.1/24;
+            }
+        }
+    }
+}
+security {
+    policies {
+        from-zone untrust to-zone trust {
+            policy default-deny {
+                match {
+                    source-address any;
+                    destination-address any;
+                    application any;
+                }
+                then {
+                    deny;
+                }
+            }
+        }
+    }
+}

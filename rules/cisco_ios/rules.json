@@ -1,0 +1,116 @@
+[
+    {
+        "id": "CIS-SEC-001",
+        "name": "Service Password-Encryption Disabled",
+        "severity": "CRITICAL",
+        "description": "Cisco IOS 'service password-encryption' command should be enabled to encrypt cleartext passwords.",
+        "details": "This command encrypts passwords in the running and startup configurations, preventing them from being easily read by unauthorized users. While not strong encryption, it's a basic security hygiene.",
+        "affected_config_template": "Global configuration: 'no service password-encryption' or missing 'service password-encryption'.",
+        "check": {
+            "operator": "not_contains_item",
+            "target": "system_services",
+            "value": {
+                "name": "password-encryption",
+                "enabled": true
+            }
+        }
+    },
+    {
+        "id": "CIS-SEC-002",
+        "name": "Insecure SNMP Community Strings",
+        "severity": "HIGH",
+        "description": "SNMP community strings 'public' or 'private' should not be used.",
+        "details": "Default SNMP community strings are well-known and allow unauthorized users to gain information about the device. They must be changed to strong, unique values.",
+        "affected_config_template": "SNMP community string '{community_name}' found.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "where": {
+                "target": "service.name",
+                "operator": "equals",
+                "value": "snmp"
+            },
+            "inner_check": {
+                "operator": "for_each",
+                "target": "service.communities",
+                "item_var": "community",
+                "inner_check": {
+                    "condition": {
+                        "operator": "in",
+                        "target": "community.name",
+                        "value": ["public", "private"]
+                    },
+                    "affected_params": {
+                        "community_name": "community.name"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "id": "CIS-FW-001",
+        "name": "Permissive Access-List Rule (Any/Any)",
+        "severity": "CRITICAL",
+        "description": "Access-list rules should be specific and avoid 'permit any' statements.",
+        "details": "Overly permissive access-list rules can expose the network to significant risks by allowing unintended traffic. All rules should be as specific as possible.",
+        "affected_config_template": "Access-list '{acl_name}' rule '{rule_line}' permits any/any.",
+        "check": {
+            "operator": "for_each",
+            "target": "security_policies",
+            "item_var": "acl",
+            "where": {
+                "target": "acl.type",
+                "operator": "equals",
+                "value": "access-list"
+            },
+            "inner_check": {
+                "operator": "for_each",
+                "target": "acl.rules",
+                "item_var": "rule",
+                "inner_check": {
+                    "condition": {
+                        "operator": "and",
+                        "conditions": [
+                            { "target": "rule.action", "operator": "equals", "value": "permit" },
+                            { "target": "rule.source", "operator": "equals", "value": "any" },
+                            { "target": "rule.destination", "operator": "equals", "value": "any" }
+                        ]
+                    },
+                    "affected_params": {
+                        "acl_name": "acl.name",
+                        "rule_line": "rule.line"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "id": "CIS-MGT-001",
+        "name": "VTY Lines Without Access-Class",
+        "severity": "HIGH",
+        "description": "VTY (Telnet/SSH) lines should have an access-class applied to restrict management access.",
+        "details": "Without an access-class, any host can attempt to connect to the device's management interfaces. Restrict access to trusted management subnets.",
+        "affected_config_template": "VTY line {line_number} is missing an access-class.",
+        "check": {
+            "operator": "for_each",
+            "target": "interface_configs",
+            "item_var": "line",
+            "where": {
+                "target": "line.type",
+                "operator": "equals",
+                "value": "vty"
+            },
+            "inner_check": {
+                "condition": {
+                    "target": "line.access_class_applied",
+                    "operator": "equals",
+                    "value": false
+                },
+                "affected_params": {
+                    "line_number": "line.name"
+                }
+            }
+        }
+    }
+]

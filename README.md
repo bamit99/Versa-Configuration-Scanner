@@ -1,26 +1,35 @@
-# Versa Configuration Auditor
+# Configuration Auditor
 
-This is a web-based tool to audit Versa Networks configuration files for security vulnerabilities and best-practice deviations. You can upload configuration files in various formats (CLI, JSON, XML), and the tool will generate a report with its findings.
+This is a web-based tool designed to audit network device configuration files for security vulnerabilities and best-practice deviations. It supports multiple platforms and provides a user-friendly interface for uploading files, tracking scan progress, and reviewing historical reports.
 
 ## Features
 
-- **Multi-Format Support:** Parses configurations from CLI (`set` commands), JSON, and XML files.
-- **Extensible Rule Engine:** Audit rules are defined in an external `rules.json` file, making it easy to add or modify checks without changing the core application logic.
-- **Web-Based UI:** A simple and clean user interface for uploading files and viewing reports.
-- **HTML & CSV Reporting:** Generates a user-friendly HTML report and a CSV file for easy data export and analysis.
-- **Persistent CSV Reports:** Findings are appended to a CSV file, creating a historical log of all scans.
+-   **Multi-Platform Support with Auto-Detection:** Automatically identifies the vendor/platform (e.g., Versa) of the uploaded configuration file based on its content. Future extensions will support more platforms.
+-   **Multi-Format Support:** Parses configurations from CLI (`set` commands), JSON, and XML files.
+-   **Asynchronous Scanning & Session Recovery:** Long-running scans are processed in the background, allowing the user to navigate away or refresh the page. The tool can recover the status of ongoing or completed scans upon returning.
+-   **Extensible Rule Engine:** Audit rules are defined in external JSON files, organized by platform, making it easy to add or modify checks without changing the core application logic.
+-   **Web-Based UI with Navigation:** A clean and intuitive user interface with a global navigation bar to easily switch between the main scanner page and the scan history.
+-   **Scan History Dashboard:** A dedicated page to view a list of all past scans, their status, and links to their respective reports.
+-   **HTML & CSV Reporting:** Generates a user-friendly HTML report and a CSV file for easy data export and analysis.
+-   **Persistent Scan Records:** Scan metadata (status, filename, platform, report link) is stored in a SQLite database, ensuring history is retained across application restarts.
 
 ## Project Structure
 
 ```
 .
-├── app.py              # Main Flask application file (routes, views, config parsing)
-├── engine.py           # Contains the core RuleEngine for evaluating configs
-├── rules.json          # Extensible list of audit rules
+├── app.py              # Main Flask application file (routes, views, task management)
+├── engine.py           # Contains core logic: PlatformDetector, BaseConfigParser, VersaConfigParser, RuleEngine
+├── database.py         # Handles SQLite database initialization and operations for scan history
+├── IMPROVEMENT_TRACKER.md # Document tracking potential future enhancements
+├── rules/              # Directory for platform-specific audit rules
+│   └── versa/
+│       └── rules.json  # Audit rules for Versa configurations
 ├── requirements.txt    # Python package dependencies
 ├── templates/
-│   ├── index.html      # Main upload page
-│   └── report.html     # Report view template
+│   ├── base.html       # Base template for consistent UI (includes navigation)
+│   ├── index.html      # Main configuration upload/scanner page
+│   ├── report.html     # Audit report view template
+│   └── history.html    # Scan history dashboard template
 ├── uploads/            # Directory for storing uploaded config files (ignored by git)
 │   └── .gitkeep
 ├── reports/            # Directory for generated HTML and CSV reports (ignored by git)
@@ -43,8 +52,8 @@ This is a web-based tool to audit Versa Networks configuration files for securit
     source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 
     # Or using conda
-    conda create --name versa-auditor python=3.11
-    conda activate versa-auditor
+    conda create --name config-auditor python=3.11
+    conda activate config-auditor
     ```
 
 3.  **Install dependencies:**
@@ -66,31 +75,60 @@ This is a web-based tool to audit Versa Networks configuration files for securit
 
 ## How to Extend
 
-Adding a new audit rule is a two-step process:
+The tool is designed for easy extension, particularly for adding new platforms or audit rules.
 
-1.  **Define the Rule in `rules.json`:**
-    Add a new JSON object to the `rules.json` file with the following structure:
+### Adding New Audit Rules
+
+To add a new audit rule for an **existing platform** (e.g., Versa):
+
+1.  **Locate the Platform's Rule File:** Navigate to the `rules/` directory and find the JSON file for your target platform (e.g., `rules/versa/rules.json`).
+2.  **Define the Rule:** Add a new JSON object to this file. The `check` object within the rule defines how the `RuleEngine` evaluates the configuration. You do **not** need to modify `engine.py` for new rules, as the engine is designed to interpret the `check` logic dynamically.
+
+    Example structure:
     ```json
     {
-        "id": "VOS-CAT-00X",
+        "id": "VOS-NEW-001",
+        "name": "New Example Rule",
         "severity": "MEDIUM",
-        "description": "A brief description of the rule.",
-        "details": "More detailed explanation of the vulnerability or misconfiguration and why it's a problem.",
-        "affected_config_template": "A template string showing the part of the config that is affected, e.g., 'System > Services > {service_name}'"
+        "description": "A brief description of the new rule.",
+        "details": "More detailed explanation of the vulnerability or misconfiguration.",
+        "affected_config_template": "A template string showing the affected config, e.g., 'System: Feature {feature_name} is misconfigured.'",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.name", "operator": "equals", "value": "example-feature" },
+                        { "target": "service.status", "operator": "equals", "value": "misconfigured" }
+                    ]
+                },
+                "affected_params": {
+                    "feature_name": "service.name"
+                }
+            }
+        }
     }
     ```
+    The `RuleEngine` supports various operators (`equals`, `contains`, `is_present`, `for_each`, `and`, `or`, etc.) to define complex checks.
 
-2.  **Implement the Logic in `engine.py`:**
-    In the `RuleEngine.evaluate` method, add the Python code to check the `normalized_config` data for the condition defined in your new rule. If the condition is met, call `self._add_finding()` with the rule's ID.
+### Adding Support for a New Platform
 
-    ```python
-    # In engine.py inside the evaluate method
+To add a new network platform (e.g., Cisco IOS, Juniper Junos):
 
-    # RULE_ID: VOS-CAT-00X
-    if 'VOS-CAT-00X' in self.rules:
-        # Your logic here to check the normalized_config
-        if (condition_is_met):
-            self._add_finding('VOS-CAT-00X', affected_config_params={'param': 'value'})
-    ```
+1.  **Create a New Parser:**
+    *   In `engine.py`, create a new class that inherits from `BaseConfigParser` (e.g., `CiscoIOSConfigParser`).
+    *   Implement the `load_config` method to parse the new platform's configuration format into a raw data structure.
+    *   Implement the `normalize_configuration` method to transform this raw data into the standardized data model used by the `RuleEngine`.
+2.  **Update `PARSERS` Dictionary:**
+    *   In `app.py`, add your new parser class to the `PARSERS` dictionary, mapping a platform name (e.g., `'cisco_ios'`) to your new parser class.
+3.  **Create Platform-Specific Rules:**
+    *   Create a new directory under `rules/` for your platform (e.g., `rules/cisco_ios/`).
+    *   Inside this directory, create a `rules.json` file containing the audit rules specific to this new platform, following the structure described above.
+4.  **Update UI (Optional but Recommended):**
+    *   In `templates/index.html`, add an `<option>` tag to the platform selection dropdown for your new platform.
+    *   (Optional) Enhance the `PlatformDetector` in `engine.py` with heuristics to auto-detect your new platform based on its unique configuration syntax.
 
-This modular approach allows for easy expansion of the auditor's capabilities.
+This modular approach allows for continuous expansion of the auditor's capabilities.

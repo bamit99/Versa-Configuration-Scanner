@@ -1,12 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audit Report for {{ filename }}</title>
+{% extends "base.html" %}
+
+{% block title %}Audit Report for {{ filename }}{% endblock %}
+
+{% block head_extra %}
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 20px; background-color: #f4f4f4; color: #333; }
-        .container { max-width: 1200px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         h1, h2 { color: #0056b3; }
         h1 { text-align: center; }
         .summary { border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-around; text-align: center; }
@@ -38,72 +35,70 @@
         .download-btn { background-color: #28a745; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px; font-size: 0.9em; }
         .download-btn:hover { background-color: #218838; }
     </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Audit Report</h1>
-        <p style="text-align:center;"><strong>File:</strong> {{ filename }}<br><strong>Report Generated:</strong> {{ now().strftime('%Y-%m-%d %H:%M:%S UTC') }}</p>
+{% endblock %}
 
-        {% if csv_report_name %}
-        <div style="text-align: center; margin-bottom: 20px;">
-            <a href="/reports/{{ csv_report_name }}" class="download-btn" download>Download Report as CSV</a>
-        </div>
-        {% endif %}
+{% block content %}
+    <h1>Audit Report</h1>
+    <p style="text-align:center;"><strong>File:</strong> {{ filename }}<br><strong>Report Generated:</strong> {{ now().strftime('%Y-%m-%d %H:%M:%S UTC') }}</p>
 
-        <h2>Summary</h2>
-        <div class="summary">
-            <div class="summary-box info">
-                <h3>{{ total_rules }}</h3>
-                <p>Rules Scanned</p>
-            </div>
-            <div class="summary-box total">
-                <h3>{{ total_findings }}</h3>
-                <p>Total Findings</p>
-            </div>
-            <div class="summary-box critical">
-                <h3>{{ severity_counts.CRITICAL }}</h3>
-                <p>Critical</p>
-            </div>
-            <div class="summary-box high">
-                <h3>{{ severity_counts.HIGH }}</h3>
-                <p>High</p>
-            </div>
-            <div class="summary-box medium">
-                <h3>{{ severity_counts.MEDIUM }}</h3>
-                <p>Medium</p>
-            </div>
-            <div class="summary-box warning">
-                <h3>{{ severity_counts.WARNING }}</h3>
-                <p>Warning</p>
-            </div>
-            <div class="summary-box low">
-                <h3>{{ severity_counts.LOW }}</h3>
-                <p>Low</p>
-            </div>
-        </div>
-
-        <h2>Findings</h2>
-        {% if findings %}
-            {% for finding in findings %}
-            <div class="finding {{ finding.severity }}">
-                <div class="finding-header">
-                    <span class="severity-{{ finding.severity.lower() }}">[{{ finding.severity }}]</span> {{ finding.description }}
-                </div>
-                <div class="finding-details">
-                    <p><strong>Rule ID:</strong> {{ finding.rule_id }}</p>
-                    <p><strong>Details:</strong> {{ finding.details }}</p>
-                    <p><strong>Affected Configuration:</strong> <code>{{ finding.affected_config }}</code></p>
-                </div>
-            </div>
-            {% endfor %}
-        {% else %}
-            <div class="no-findings">
-                <p>🎉 No findings were identified. The configuration appears to be compliant with the checked rules.</p>
-            </div>
-        {% endif %}
+    {% if csv_report_name %}
+    <div style="text-align: center; margin-bottom: 20px;">
+        <a href="/reports/{{ csv_report_name }}" class="download-btn" download>Download Report as CSV</a>
     </div>
+    {% endif %}
+
+    <h2>Summary</h2>
+    <div class="summary">
+        <div class="summary-box info">
+            <h3>{{ total_rules }}</h3>
+            <p>Rules Scanned</p>
+        </div>
+        <div class="summary-box total">
+            <h3>{{ total_findings }}</h3>
+            <p>Total Findings</p>
+        </div>
+        <div class="summary-box critical">
+            <h3>{{ severity_counts.CRITICAL }}</h3>
+            <p>Critical</p>
+        </div>
+        <div class="summary-box high">
+            <h3>{{ severity_counts.HIGH }}</h3>
+            <p>High</p>
+        </div>
+        <div class="summary-box medium">
+            <h3>{{ severity_counts.MEDIUM }}</h3>
+            <p>Medium</p>
+        </div>
+        <div class="summary-box warning">
+            <h3>{{ severity_counts.WARNING }}</h3>
+            <p>Warning</p>
+        </div>
+        <div class="summary-box low">
+            <h3>{{ severity_counts.LOW }}</h3>
+            <p>Low</p>
+        </div>
+    </div>
+
+    <h2>Findings</h2>
+    {% if findings %}
+        {% for finding in findings %}
+        <div class="finding {{ finding.severity }}">
+            <div class="finding-header">
+                <span class="severity-{{ finding.severity.lower() }}">[{{ finding.severity }}]</span> {{ finding.description }}
+            </div>
+            <div class="finding-details">
+                <p><strong>Rule ID:</strong> {{ finding.rule_id }}</p>
+                <p><strong>Details:</strong> {{ finding.details }}</p>
+                <p><strong>Affected Configuration:</strong> <code>{{ finding.affected_config }}</code></p>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="no-findings">
+            <p>🎉 No findings were identified. The configuration appears to be compliant with the checked rules.</p>
+        </div>
+    {% endif %}
     <div class="footer">
         <p>Versa Configuration Auditor</p>
     </div>
-</body>
-</html>
+{% endblock %}

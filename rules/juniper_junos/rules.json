@@ -1,0 +1,60 @@
+[
+    {
+        "id": "JUN-SEC-001",
+        "name": "Root Login via SSH with Password",
+        "severity": "CRITICAL",
+        "description": "Direct root login via SSH with password authentication should be disabled.",
+        "details": "Allowing root login directly via SSH with passwords is a security risk. Use key-based authentication or log in as a regular user and then su to root.",
+        "affected_config_template": "System: Root authentication via password enabled for SSH.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "where": {
+                "target": "service.name",
+                "operator": "equals",
+                "value": "ssh"
+            },
+            "inner_check": {
+                "condition": {
+                    "operator": "and",
+                    "conditions": [
+                        { "target": "service.root_login_enabled", "operator": "equals", "value": true },
+                        { "target": "service.password_authentication_enabled", "operator": "equals", "value": true }
+                    ]
+                },
+                "affected_params": {
+                    "service_name": "service.name"
+                }
+            }
+        }
+    },
+    {
+        "id": "JUN-SEC-002",
+        "name": "Telnet Service Enabled",
+        "severity": "CRITICAL",
+        "description": "Telnet is an insecure protocol and should be disabled.",
+        "details": "Telnet transmits data, including credentials, in plaintext, making it vulnerable to eavesdropping and man-in-the-middle attacks. Use SSH instead.",
+        "affected_config_template": "System Services: Telnet enabled.",
+        "check": {
+            "operator": "for_each",
+            "target": "system_services",
+            "item_var": "service",
+            "where": {
+                "target": "service.name",
+                "operator": "equals",
+                "value": "telnet"
+            },
+            "inner_check": {
+                "condition": {
+                    "target": "service.enabled",
+                    "operator": "equals",
+                    "value": true
+                },
+                "affected_params": {
+                    "service_name": "service.name"
+                }
+            }
+        }
+    }
+]

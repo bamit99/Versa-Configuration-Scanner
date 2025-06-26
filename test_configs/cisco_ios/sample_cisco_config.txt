@@ -1,0 +1,28 @@
+hostname CiscoRouter
+!
+interface GigabitEthernet0/0
+ ip address 192.168.1.1 255.255.255.0
+ no shutdown
+!
+interface GigabitEthernet0/1
+ no ip address
+ shutdown
+!
+service password-encryption
+!
+line con 0
+ password consolepass
+ login
+!
+line vty 0 4
+ password telnetpass
+ login
+ transport input telnet
+!
+access-list 10 permit any
+access-list 100 permit ip any any
+!
+snmp-server community public RO
+snmp-server community private RW
+!
+end
