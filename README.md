@@ -137,19 +137,24 @@ This modular approach allows for continuous expansion of the auditor's capabilit
 
 ## Recent Fixes and Improvements
 
-### Version 2.0 Updates (June 2025)
+### Version 2.1 Updates (June 2025)
 
 **Fixed Critical Issues:**
 - ✅ **Upload Button Not Working**: Fixed missing JavaScript DOM element references and template block issues
 - ✅ **Flask Context Errors**: Resolved background thread template rendering issues by implementing direct HTML generation
 - ✅ **Missing Progress Updates**: Added real-time scanning progress with loading indicators
 - ✅ **Template Integration**: Fixed base template to properly include JavaScript from child templates
+- ✅ **Cisco IOS Parser Errors**: Fixed `'NoneType' object has no attribute 'get'` errors in rule engine and ACL parsing
+- ✅ **Rule Engine Validation**: Added comprehensive null checking and condition validation
+- ✅ **Nested Rule Processing**: Fixed complex nested `for_each` rule structures for multi-platform support
 
 **New Features:**
 - 🆕 **Debug Mode**: Added optional debugging checkbox to troubleshoot upload/scan issues
-- 🆕 **Enhanced Error Handling**: Improved error messages and UI state management
+- 🆕 **Enhanced Error Handling**: Improved error messages and UI state management with full traceback logging
 - 🆕 **Better Platform Detection**: Enhanced auto-detection algorithms with scoring system
 - 🆕 **Responsive UI**: Improved loading states and button feedback
+- 🆕 **Robust ACL Parsing**: Enhanced Cisco IOS ACL parsing to handle both standard and extended formats
+- 🆕 **Comprehensive Logging**: Added detailed step-by-step logging for debugging scan failures
 
 ## Testing
 
@@ -196,3 +201,43 @@ Enable the debug checkbox on the main page to see detailed information about:
 - Error details and network issues
 
 This helps identify where issues occur in the upload → scan → report pipeline.
+
+## About
+
+### Developer Information
+
+<div align="center">
+
+**[Your Name Here]**  
+*Network Security & Configuration Auditing Specialist*
+
+---
+
+📧 **Email:** [your.email@example.com](mailto:your.email@example.com)  
+💼 **LinkedIn:** [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white)](https://linkedin.com/in/your-linkedin-profile)  
+🐙 **GitHub:** [![GitHub](https://img.shields.io/badge/GitHub-100000?style=flat&logo=github&logoColor=white)](https://github.com/your-github-username)
+
+---
+
+*Passionate about network security, automation, and building tools that help organizations maintain secure and compliant network infrastructures.*
+
+</div>
+
+### Project Information
+
+This Configuration Auditor was developed to address the growing need for automated security compliance checking across multi-vendor network environments. The tool supports extensible rule engines and multiple configuration formats to provide comprehensive security auditing capabilities.
+
+**Key Contributions:**
+- Multi-platform configuration parsing (Versa, Cisco IOS, Juniper Junos)
+- Extensible rule engine with dynamic condition evaluation
+- Real-time scanning with background processing
+- Comprehensive error handling and debugging capabilities
+- Web-based interface with persistent scan history
+
+### Contributing
+
+Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests to help improve this tool.
+
+### License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

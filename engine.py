@@ -389,18 +389,101 @@ class CiscoIOSConfigParser(BaseConfigParser):
                 snmp_communities.append({'name': match.group(1), 'permission': match.group(2)})
         if snmp_communities:
             normalized_data['system_services'].append({'name': 'snmp', 'communities': snmp_communities})
+        
+        # Also handle cases where SNMP community doesn't have explicit RO/RW
+        for line in self.raw_config_lines:
+            match = re.search(r"snmp-server community (\S+)(?:\s+(RO|RW))?", line)
+            if match and not any(comm['name'] == match.group(1) for comm in snmp_communities):
+                permission = match.group(2) if match.group(2) else 'RO'  # Default to RO if not specified
+                snmp_communities.append({'name': match.group(1), 'permission': permission})
+        
+        # Update the service entry if we found any communities
+        if snmp_communities and not any(service.get('name') == 'snmp' for service in normalized_data['system_services']):
+            normalized_data['system_services'].append({'name': 'snmp', 'communities': snmp_communities})
 
         # --- Security Policies (Access-Lists) ---
-        # This logic needs to be robust for various ACL types (standard, extended, named)
-        # For simplicity, let's focus on basic numbered ACLs for now
+        # Parse both standard and extended ACLs with proper null checking
         for line in self.raw_config_lines:
-            # Standard ACL: access-list 10 permit any
-            acl_standard_match = re.match(r"access-list (\d+)\s+(permit|deny)\s+(.+)", line)
+            line_stripped = line.strip()
+            if not line_stripped.startswith('access-list'):
+                continue
+                
+            # Try to match extended ACL first (with or without "extended" keyword)
+            # Pattern 1: access-list 100 permit ip any any (without "extended")
+            acl_extended_match = re.match(r"access-list\s+(\d+)\s+(permit|deny)\s+(ip|tcp|udp|icmp)\s+(\S+)\s+(\S+)", line_stripped)
+            if acl_extended_match:
+                acl_name = acl_extended_match.group(1)
+                action = acl_extended_match.group(2)
+                protocol = acl_extended_match.group(3)
+                source = acl_extended_match.group(4)
+                destination = acl_extended_match.group(5)
+
+                if source.lower() == 'any': 
+                    source = 'any'
+                if destination.lower() == 'any': 
+                    destination = 'any'
+
+                rule = {
+                    'line': line_stripped,
+                    'action': action,
+                    'protocol': protocol,
+                    'source': source,
+                    'destination': destination,
+                    'service': 'any',
+                    'type': 'extended'
+                }
+                
+                # Find or create ACL
+                found_acl = next((acl for acl in normalized_data['security_policies'] if acl.get('name') == acl_name), None)
+                if not found_acl:
+                    found_acl = {'name': acl_name, 'type': 'access-list', 'rules': []}
+                    normalized_data['security_policies'].append(found_acl)
+                found_acl['rules'].append(rule)
+                continue
+            
+            # Pattern 2: access-list 100 extended permit ip any any (with "extended")
+            acl_extended_with_keyword_match = re.match(r"access-list\s+(\d+)\s+extended\s+(permit|deny)\s+(ip|tcp|udp|icmp)\s+(\S+)\s+(\S+)", line_stripped)
+            if acl_extended_with_keyword_match:
+                acl_name = acl_extended_with_keyword_match.group(1)
+                action = acl_extended_with_keyword_match.group(2)
+                protocol = acl_extended_with_keyword_match.group(3)
+                source = acl_extended_with_keyword_match.group(4)
+                destination = acl_extended_with_keyword_match.group(5)
+
+                if source.lower() == 'any': 
+                    source = 'any'
+                if destination.lower() == 'any': 
+                    destination = 'any'
+
+                rule = {
+                    'line': line_stripped,
+                    'action': action,
+                    'protocol': protocol,
+                    'source': source,
+                    'destination': destination,
+                    'service': 'any',
+                    'type': 'extended'
+                }
+                
+                # Find or create ACL
+                found_acl = next((acl for acl in normalized_data['security_policies'] if acl.get('name') == acl_name), None)
+                if not found_acl:
+                    found_acl = {'name': acl_name, 'type': 'access-list', 'rules': []}
+                    normalized_data['security_policies'].append(found_acl)
+                found_acl['rules'].append(rule)
+                continue
+
+            # Standard ACL: access-list 10 permit any (only if not already matched as extended)
+            acl_standard_match = re.match(r"access-list\s+(\d+)\s+(permit|deny)\s+(.+)", line_stripped)
             if acl_standard_match:
                 acl_name = acl_standard_match.group(1)
                 action = acl_standard_match.group(2)
-                # For standard ACLs, source is the third group, destination is implied 'any'
                 source_part = acl_standard_match.group(3).strip()
+                
+                # Skip if this looks like an extended ACL that we missed
+                if any(proto in source_part.lower() for proto in ['ip', 'tcp', 'udp', 'icmp']):
+                    continue
+                
                 source = 'any'
                 destination = 'any'
                 
@@ -409,47 +492,22 @@ class CiscoIOSConfigParser(BaseConfigParser):
                     source_match = re.match(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?:\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))?", source_part)
                     if source_match:
                         source = source_match.group(1)
-                        if source_match.group(2): # Wildcard mask
+                        if source_match.group(2):  # Wildcard mask
                             source += f" {source_match.group(2)}"
-                    else: # Could be a host or other complex source
-                        source = source_part # Keep as is for now
+                    else:  # Could be a host or other complex source
+                        source = source_part
 
                 rule = {
-                    'line': line.strip(),
+                    'line': line_stripped,
                     'action': action,
                     'source': source,
                     'destination': destination,
-                    'service': 'any', # Standard ACLs don't specify service
+                    'service': 'any',
                     'type': 'standard'
                 }
-                found_acl = next((acl for acl in normalized_data['security_policies'] if acl['name'] == acl_name), None)
-                if not found_acl:
-                    found_acl = {'name': acl_name, 'type': 'access-list', 'rules': []}
-                    normalized_data['security_policies'].append(found_acl)
-                found_acl['rules'].append(rule)
-
-            # Extended ACL: access-list 100 permit ip any any
-            acl_extended_match = re.match(r"access-list (\d+)\s+extended\s+(permit|deny)\s+(ip|tcp|udp|icmp)\s+(\S+)\s+(\S+)", line)
-            if acl_extended_match:
-                acl_name = acl_extended_match.group(1)
-                action = acl_extended_match.group(2)
-                protocol = acl_extended_match.group(3)
-                source = acl_extended_match.group(4)
-                destination = acl_extended_match.group(5)
-
-                if source.lower() == 'any': source = 'any'
-                if destination.lower() == 'any': destination = 'any'
-
-                rule = {
-                    'line': line.strip(),
-                    'action': action,
-                    'protocol': protocol,
-                    'source': source,
-                    'destination': destination,
-                    'service': 'any', # Service might be implied by protocol or port
-                    'type': 'extended'
-                }
-                found_acl = next((acl for acl in normalized_data['security_policies'] if acl['name'] == acl_name), None)
+                
+                # Find or create ACL
+                found_acl = next((acl for acl in normalized_data['security_policies'] if acl.get('name') == acl_name), None)
                 if not found_acl:
                     found_acl = {'name': acl_name, 'type': 'access-list', 'rules': []}
                     normalized_data['security_policies'].append(found_acl)
@@ -458,16 +516,21 @@ class CiscoIOSConfigParser(BaseConfigParser):
         # --- Interface Configurations (for VTY lines) ---
         current_line_vty = None
         for line in self.raw_config_lines:
-            vty_match = re.match(r"line vty (\d+)\s+(\d+)", line)
+            line_stripped = line.strip()
+            
+            # Check for VTY line configuration
+            vty_match = re.match(r"line vty (\d+)(?:\s+(\d+))?", line_stripped)
             if vty_match:
-                line_name = f"{vty_match.group(1)} {vty_match.group(2)}"
+                start_line = vty_match.group(1)
+                end_line = vty_match.group(2) if vty_match.group(2) else start_line
+                line_name = f"{start_line} {end_line}"
                 current_line_vty = {'name': line_name, 'type': 'vty', 'access_class_applied': False}
                 normalized_data['interface_configs'].append(current_line_vty)
-            elif current_line_vty and "access-class" in line:
+            elif current_line_vty and "access-class" in line_stripped:
                 current_line_vty['access_class_applied'] = True
-            elif current_line_vty and not line.strip(): # End of block
+            elif current_line_vty and not line_stripped:  # End of block (empty line)
                 current_line_vty = None
-            elif current_line_vty and not line.startswith(' '): # End of block (no indentation)
+            elif current_line_vty and not line.startswith(' '):  # End of block (no indentation)
                 current_line_vty = None
 
 
@@ -610,12 +673,18 @@ class RuleEngine:
 
     def _get_value_from_path(self, data, path):
         """Safely retrieves a nested value from a dictionary using a dot-separated path."""
+        if not data or not path:
+            return None
+            
         parts = path.split('.')
         current_data = data
+        
         for part in parts:
-            if isinstance(current_data, dict) and part in current_data:
+            if current_data is None:
+                return None
+            elif isinstance(current_data, dict) and part in current_data:
                 current_data = current_data[part]
-            elif isinstance(current_data, list) and part.isdigit(): # Allow indexing into lists
+            elif isinstance(current_data, list) and part.isdigit():
                 try:
                     current_data = current_data[int(part)]
                 except (IndexError, ValueError):
@@ -639,6 +708,10 @@ class RuleEngine:
             "conditions": [...]
         }
         """
+        if not condition or not isinstance(condition, dict):
+            app.logger.warning(f"Invalid condition: {condition}. Expected a dictionary.")
+            return False
+            
         operator = condition.get('operator')
 
         if operator in ['and', 'or']:
@@ -761,8 +834,7 @@ class RuleEngine:
                     if inner_check and inner_check.get('operator') == 'for_each':
                         inner_target_list_path = inner_check.get('target')
                         inner_iterator_var = inner_check.get('item_var')
-                        inner_condition = inner_check.get('condition')
-                        inner_affected_params_map = inner_check.get('affected_params', {})
+                        inner_check_nested = inner_check.get('inner_check')
                         inner_where_condition = inner_check.get('where') # New: Nested 'where'
 
                         inner_target_list = self._get_value_from_path(temp_data_context, inner_target_list_path)
@@ -784,11 +856,18 @@ class RuleEngine:
                             # Extend temp_data_context for the innermost item
                             innermost_data_context = {**temp_data_context, inner_iterator_var: inner_item}
                             
-                            if self._evaluate_condition(inner_condition, innermost_data_context):
-                                affected_params = {}
-                                for param_name, param_path in inner_affected_params_map.items():
-                                    affected_params[param_name] = self._get_value_from_path(innermost_data_context, param_path)
-                                self._add_finding(rule_id, affected_params)
+                            # Check if we have a valid nested inner_check
+                            if inner_check_nested and inner_check_nested.get('condition'):
+                                inner_condition = inner_check_nested.get('condition')
+                                inner_affected_params_map = inner_check_nested.get('affected_params', {})
+                                
+                                if self._evaluate_condition(inner_condition, innermost_data_context):
+                                    affected_params = {}
+                                    for param_name, param_path in inner_affected_params_map.items():
+                                        affected_params[param_name] = self._get_value_from_path(innermost_data_context, param_path)
+                                    self._add_finding(rule_id, affected_params)
+                            else:
+                                app.logger.warning(f"Rule {rule_id}: Nested 'for_each' missing valid 'inner_check.condition'. Skipping nested item.")
                     elif inner_check and inner_check.get('condition'):
                         # Simple condition within a single for_each loop
                         if self._evaluate_condition(inner_check['condition'], temp_data_context):

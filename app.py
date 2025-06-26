@@ -175,22 +175,43 @@ def run_scan_task(task_id):
             filename = task['filename']
             platform = task['platform']
 
+            app.logger.info(f"Starting scan for {filename} with platform {platform}")
+
             # Dynamically get the parser based on the detected platform
             parser_class = PARSERS.get(platform)
             if not parser_class:
                 raise ValueError(f"Unsupported platform: {platform}")
             
+            app.logger.info(f"Using parser class: {parser_class.__name__}")
             parser: BaseConfigParser = parser_class() # Instantiate the correct parser
+            
+            app.logger.info(f"Loading config from {filepath}")
             parsed_data = parser.load_config(filepath)
 
             if not parsed_data:
                 raise ValueError(f"Could not parse the configuration file '{filename}' for platform '{platform}'. Please ensure it is a valid and supported format.")
 
+            app.logger.info(f"Normalizing configuration...")
             normalized_config = parser.normalize_configuration()
+            
+            if not normalized_config:
+                raise ValueError(f"Failed to normalize configuration for '{filename}' with platform '{platform}'.")
 
+            app.logger.info(f"Normalized config keys: {list(normalized_config.keys()) if normalized_config else 'None'}")
+
+            app.logger.info(f"Loading rules for platform {platform}")
             rules = load_rules(platform) # Load platform-specific rules
+            
+            if not rules:
+                raise ValueError(f"No rules found for platform '{platform}'.")
+
+            app.logger.info(f"Loaded {len(rules)} rules, creating rule engine")
             rule_engine = RuleEngine(rules)
+            
+            app.logger.info(f"Evaluating rules against normalized config")
             findings = rule_engine.evaluate(normalized_config)
+
+            app.logger.info(f"Found {len(findings)} findings, generating report")
 
             report_filename = f"audit_report_{filename}_{task_id}.html"
             report_filepath = os.path.join(REPORTS_DIR, report_filename)
@@ -213,6 +234,10 @@ def run_scan_task(task_id):
             update_scan_record(task_id, 'completed', report_name=report_filename)
 
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            app.logger.error(f"Scan for task {task_id} failed with full traceback:\n{error_details}")
+            
             with task_lock:
                 task['status'] = 'failed'
                 task['error'] = str(e)
@@ -253,6 +278,11 @@ def history():
     """Displays a list of all past scan reports."""
     scans = get_all_scans()
     return render_template('history.html', scans=scans)
+
+@app.route('/about')
+def about():
+    """Displays information about the application and developer."""
+    return render_template('about.html')
 
 def get_severity_counts(findings):
     counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'WARNING': 0, 'LOW': 0}
